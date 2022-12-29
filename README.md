@@ -1,2 +1,6 @@
-# novel_dmp_generalization
-Efficient generalization and extension of the online adaptation capabilities of Dynamics Moment Primitives
+# Efficient DMP generalization to time-varying targets, external signals and via-points
+
+This package contains the source code used in the simulations and experiments of the paper "**Efficient DMP generalization to time-varying targets, external signals and via-points**" (under review)
+
+- For the simulations, see the instructions in `simulations/README.md`
+- For the experiments,  see the instructions in `experiments/README.md`

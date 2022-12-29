@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package>
+  <name>gmp_lib</name>
+  <version>0.0.0</version>
+  <description>Dynamic Movement Primitives package</description>
+
+  <maintainer email="antosidi646@gmail.com">Antonis Sidiropoulos</maintainer>
+
+  <license>MIT</license>
+
+  <build_depend>osqp_lib</build_depend>
+  <run_depend>osqp_lib</run_depend>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <export></export>
+</package>

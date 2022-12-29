@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package>
+  <name>io_lib</name>
+  <version>0.0.0</version>
+  <description>The io_lib package</description>
+
+  <maintainer email="antosidi646@gmail.com">Slifer64</maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <export></export>
+</package>

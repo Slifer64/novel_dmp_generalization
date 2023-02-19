@@ -75,6 +75,9 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.y0 = y0;
 
             O_zeros = zeros(this.n_dof, 1);
+            
+            this.gmp.setGoal(yg);
+            this.gmp.setY0(y0);
 
             % initial state constraints: pos, vel, accel
             this.gmp_up.updatePos(s0, this.y0, this.r0(1));
@@ -103,6 +106,8 @@ classdef DMP_pp < matlab.mixin.Copyable
         function update(this, yg, s, s_dot, y, y_dot)
             
             if (~this.prev_state.initialized), error('You need to call DMP_pp::init first!'); end
+            
+            this.gmp.setGoal(yg);
             
             s0 = 0;
             sf = 1; %max([s, 1.0]);
@@ -253,12 +258,14 @@ classdef DMP_pp < matlab.mixin.Copyable
         r1
         rv
         
+        gmp
+        
     end
     
     properties (Access = protected)
         
         gmp_up
-        gmp
+        
         
         W0
         

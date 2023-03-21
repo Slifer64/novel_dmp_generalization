@@ -26,15 +26,15 @@ toc(t_start)
 classic_traj_sc = TrajScale_Prop(n_dof);
 
 %% Rot DMP scaling
-% rot_traj_sc = TrajScale_Rot_min();
-rot_traj_sc = TrajScale_Rot_wb();
-rot_traj_sc.setWorkBenchNormal([0; 0; 1]); % set also the workbench normal
+rot_traj_sc = TrajScale_Rot_min();
+% rot_traj_sc = TrajScale_Rot_wb();
+% rot_traj_sc.setWorkBenchNormal([0; 0; 1]); % set also the workbench normal
 
 %% Bio-DMP
 can_clock_ptr = CanonicalClock();
 t_start = tic;
 for i=1:n_dof
-    dmp_bio{i} = DMP_bio(25, 60, 5, can_clock_ptr, ExpGatingFunction());
+    dmp_bio{i} = DMP_bio(25, 60, 5, can_clock_ptr, ExpGatingFunction()); %ExpGatingFunction, LinGatingFunction
     train_error(i) = dmp_bio{i}.train('LS', Timed, Pd_data(i,:), dPd_data(i,:), ddPd_data(i,:));
 end
 train_error
@@ -48,7 +48,7 @@ t_start = tic;
 P0d = Pd_data(:,1);   % Initial demo position
 Pgd = Pd_data(:,end); % Target demo position
 P0 = P0d; % set initial position for execution (for simplicity lets leave it the same as the demo)
-Pg = Pgd + [0.7; 0.8; -0.4];
+Pg = Pgd + [-0.9; 0.8; -1.6];
 
 Tf = 0.5*Timed(end); % set the time duration of the executed motion
 
@@ -63,7 +63,9 @@ get_target_fun = @(t) Pg;
 [Time_cl, P_data_cl, dP_data_cl, ddP_data_cl] = simulateModel(DMP_classic(gmp, classic_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
 [Time_rot, P_data_rot, dP_data_rot, ddP_data_rot] = simulateModel(DMP_classic(gmp, rot_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
 [Time_bio, P_data_bio, dP_data_bio, ddP_data_bio] = simulateBioDMP(dmp_bio, P0, Pg, Tf, dt);
-[Time, P_data, dP_data, ddP_data] = simulateModel(DMP_pp(gmp, rot_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
+[Time, P_data, dP_data, ddP_data] = simulateModel(DMP_pp(gmp), dt, Tf, P0, 'get_target_fun',get_target_fun);
+
+[Time_rd, P_data_rd, dP_data_rd, ddP_data_rd] = simulateModel(DMP_classic(gmp, TrajScale_roto_dial(n_dof)), dt, Tf, P0, 'get_target_fun',get_target_fun);
 
 toc(t_start)
 
@@ -80,8 +82,11 @@ dat{3} = struct('Time',Time_rot, 'Pos',P_data_rot, 'Vel',dP_data_rot, 'Accel',dd
 dat{4} = struct('Time',Time_bio, 'Pos',P_data_bio, 'Vel',dP_data_bio, 'Accel',ddP_data_bio, ...
                 'Color',[0.85 0.4 0.1], 'LineStyle','-', 'DisplayName','DMP-bio');
             
+dat{5} = struct('Time',Time_rd, 'Pos',P_data_rd, 'Vel',dP_data_rd, 'Accel',ddP_data_rd, ...
+                'Color',[0.2 0.8 0.2], 'LineStyle','-', 'DisplayName','DMP-rot-dial');
+            
 demo = struct('Time',Timed, 'Pos',Pd_data, 'Vel',dPd_data, 'Accel',ddPd_data, ...
-                'Color',[0 0.8 0], 'LineStyle',':', 'DisplayName','demo');
+                'Color',0.5*[1 1 1], 'LineStyle',':', 'DisplayName','demo');
 
 
 %% Plot results

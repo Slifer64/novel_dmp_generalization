@@ -15,6 +15,7 @@ classdef TrajScale < matlab.mixin.Copyable
         PROP_SCALE = 0
         ROT_MIN_SCALE = 1
         ROT_WB_SCALE = 2
+        ROT_DIAL_SCALE = 3
         %}
         
     end

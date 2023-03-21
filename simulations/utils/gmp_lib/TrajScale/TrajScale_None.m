@@ -29,7 +29,7 @@ classdef TrajScale_None < TrajScale
     
     methods (Access = protected) % Abstract implementations
 
-        function sc = calcScaling(this)
+        function sc = calcScaling(this, Y0, Yg)
 
             sc = eye(this.n_dof, this.n_dof);
             

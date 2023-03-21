@@ -22,16 +22,13 @@ offline_train_mse = gmp.train('LS', Timed/Timed(end), Pd_data);
 offline_train_mse
 toc(t_start)
 
-%% classical DMP
-classic_dmp = gmp.deepCopy();
-classic_dmp.setScaleMethod(TrajScale_Prop(n_dof));
+%% classical DMP scaling
+classic_traj_sc = TrajScale_Prop(n_dof);
 
-%% Rot DMP
-rot_dmp = gmp.deepCopy();
-% traj_sc = TrajScale_Rot_min();
-traj_sc = TrajScale_Rot_wb();
-traj_sc.setWorkBenchNormal([0; 0; 1]); % set also the workbench normal
-rot_dmp.setScaleMethod(traj_sc);
+%% Rot DMP scaling
+% rot_traj_sc = TrajScale_Rot_min();
+rot_traj_sc = TrajScale_Rot_wb();
+rot_traj_sc.setWorkBenchNormal([0; 0; 1]); % set also the workbench normal
 
 %% Bio-DMP
 can_clock_ptr = CanonicalClock();
@@ -53,15 +50,21 @@ Pgd = Pd_data(:,end); % Target demo position
 P0 = P0d; % set initial position for execution (for simplicity lets leave it the same as the demo)
 Pg = Pgd + [0.7; 0.8; -0.4];
 
-T = Timed(end); % set the time duration of the executed motion
+Tf = 0.5*Timed(end); % set the time duration of the executed motion
 
-dt = Ts; % time step for numerical integration
+dt = 0.005; % time step for numerical integration
+
+sc = TrajScale_Rot_wb();
+sc.setWorkBenchNormal([0 0 1]);
+
 
 %% Execute the DMP
-[Time_cl, P_data_cl, dP_data_cl, ddP_data_cl] = simulateDMP(classic_dmp, P0, Pg, T, dt);
-[Time_rot, P_data_rot, dP_data_rot, ddP_data_rot] = simulateDMP(rot_dmp, P0, Pg, T, dt);
-[Time_bio, P_data_bio, dP_data_bio, ddP_data_bio] = simulateBioDMP(dmp_bio, P0, Pg, T, dt);
-[Time, P_data, dP_data, ddP_data] = simulateModel(gmp, P0, Pg, T, dt);
+get_target_fun = @(t) Pg;
+[Time_cl, P_data_cl, dP_data_cl, ddP_data_cl] = simulateModel(DMP_classic(gmp, classic_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
+[Time_rot, P_data_rot, dP_data_rot, ddP_data_rot] = simulateModel(DMP_classic(gmp, rot_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
+[Time_bio, P_data_bio, dP_data_bio, ddP_data_bio] = simulateBioDMP(dmp_bio, P0, Pg, Tf, dt);
+[Time, P_data, dP_data, ddP_data] = simulateModel(DMP_pp(gmp, rot_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
+
 toc(t_start)
 
 %% Accumulate the results
@@ -149,159 +152,6 @@ ax2.Position = [-5 -5 0.001 0.001];
 
 %% ============================================================
 %% ============================================================
-
-function [Time, Y_data, dY_data, ddY_data] = simulateModel(gmp, y0, yg, Tf, dt)
-
-    %% set initial values
-    n_dofs = length(y0);
-
-    y = y0; % position
-    y_dot = zeros(n_dofs,1); % velocity
-    y_ddot = zeros(n_dofs,1); % acceleration
-    O_ndof = zeros(n_dofs, 1);
-
-    t = 0.0;
-
-    t_end = Tf;
-    tau = t_end;
-
-    % phase variable, from 0 to 1
-    s = 0.0;
-    s_dot = 1/tau;
-    s_ddot = 0; % since x_dot is constant here
-
-    iters = 0;
-
-    % data to log
-    Time = [];
-    Y_data = [];
-    dY_data = [];
-    ddY_data = [];
-    
-    model = DMP_pp(gmp);
-    model.init(s, y0, yg, Tf);
-    model.setAdaptToRobot(false);
-
-    %% simulate
-    while (true)
-
-        %% data logging
-        Time = [Time t];
-        Y_data = [Y_data y];
-        dY_data = [dY_data y_dot];
-        ddY_data = [ddY_data y_ddot];
-
-        %% Update DMP_pp
-        model.update(yg, s, s_dot, y, y_dot);
-        
-        %% Get reference
-        y_s = model.getRefPos(s);
-        dy_s = model.getRefVel(s, s_dot);
-        ddy_s = model.getRefAccel(s, s_dot, s_ddot);
-
-        K = 300; % set the DMP stiffness
-        D = 60; % set the DMP damping
-
-        external_signal = 0; % optionally add some external signal
-
-        % Track it using a 2nd order dynamical system. This is actually the DMP. 
-        y_ddot = ddy_s + D*(dy_s - y_dot) + K*(y_s - y) + external_signal;
-
-        %% Stopping criteria
-        if (t>=1.0*t_end) % && norm(y-g)<1e-3 && norm(dy)<5e-3)
-            break;
-        end
-
-        %% Numerical integration
-        iters = iters + 1;
-        t = t + dt;
-        s = s + s_dot*dt;
-        s_dot = s_dot + s_ddot*dt;
-        y = y + y_dot*dt;
-        y_dot = y_dot + y_ddot*dt;
-
-    end
-
-end
-
-function [Time, Y_data, dY_data, ddY_data] = simulateDMP(gmp, y0, g, T, dt)
-
-    %% set initial values
-    n_dofs = gmp.numOfDoFs(); % number of DoFs
-
-    y = y0; % position
-    dy = zeros(n_dofs,1); % velocity
-    ddy = zeros(n_dofs,1); % acceleration
-
-    t = 0.0;
-
-    t_end = T;
-    tau = t_end;
-
-    % phase variable, from 0 to 1
-    s = 0.0;
-    s_dot = 1/tau;
-    s_ddot = 0; % since x_dot is constant here
-
-    iters = 0;
-
-    % data to log
-    Time = [];
-    Y_data = [];
-    dY_data = [];
-    ddY_data = [];
-
-    gmp.setY0(y0);
-    gmp.setGoal(g);
-
-    count = 0;
-    g0 = g;
-    g_data = [];
-
-
-    %% simulate
-    while (true)
-
-        %% data logging
-        Time = [Time t];
-        Y_data = [Y_data y];
-        dY_data = [dY_data dy];
-        ddY_data = [ddY_data ddy];
-
-        g_data = [g_data g];
-
-        %% DMP simulation
-        y_s = gmp.getYd(s);
-        dy_s = gmp.getYdDot(s, s_dot);
-        ddy_s = gmp.getYdDDot(s, s_dot, s_ddot);
-
-        K = 300; % set the DMP stiffness
-        D = 60; % set the DMP damping
-
-        external_signal = 0; % optionally add some external signal
-
-        % Track it using a 2nd order dynamical system. This is actually the DMP. 
-        ddy = ddy_s + D*(dy_s - dy) + K*(y_s - y) + external_signal;
-
-        %% Stopping criteria
-        if (t>=1.0*t_end) % && norm(y-g)<1e-3 && norm(dy)<5e-3)
-            break;
-        end
-
-        count = count + 1;
-
-        %% Numerical integration
-        iters = iters + 1;
-        t = t + dt;
-        s = s + s_dot*dt;
-        s_dot = s_dot + s_ddot*dt;
-        y = y + dy*dt;
-        dy = dy + ddy*dt;
-
-    end
-
-
-end
 
 
 function [Time, Y_data, dY_data, ddY_data] = simulateBioDMP(dmp_bio, y0, g, T, dt)

@@ -2,11 +2,13 @@ classdef DMP_pp < matlab.mixin.Copyable
     
     methods (Access = public)
         
-        function this = DMP_pp(gmp)
+        function this = DMP_pp(gmp, traj_scale)
+            
+            if (nargin < 2), traj_scale=TrajScale_None(gmp.numOfDoFs()); end
             
             this.gmp = gmp.deepCopy();
             this.n_dof = this.gmp.numOfDoFs();
-            this.gmp.setScaleMethod(TrajScale_None(this.n_dof));
+            this.gmp.setScaleMethod(traj_scale);
             
             this.gmp_up = GMP_Update(this.gmp);
             this.W0 = gmp.W;
@@ -76,8 +78,8 @@ classdef DMP_pp < matlab.mixin.Copyable
 
             O_zeros = zeros(this.n_dof, 1);
             
-            this.gmp.setGoal(yg);
             this.gmp.setY0(y0);
+            this.gmp.setGoal(yg);
 
             % initial state constraints: pos, vel, accel
             this.gmp_up.updatePos(s0, this.y0, this.r0(1));
@@ -106,9 +108,7 @@ classdef DMP_pp < matlab.mixin.Copyable
         function update(this, yg, s, s_dot, y, y_dot)
             
             if (~this.prev_state.initialized), error('You need to call DMP_pp::init first!'); end
-            
-            this.gmp.setGoal(yg);
-            
+
             s0 = 0;
             sf = 1; %max([s, 1.0]);
             s_ddot = 0;
@@ -137,6 +137,8 @@ classdef DMP_pp < matlab.mixin.Copyable
 %             this.gmp.W = this.W1;
 
             % ---------- update --------------
+            this.gmp.setGoal(yg);
+            
             % current state constraints: pos, vel, accel
             this.gmp_up.updatePos(s, y1, this.r1(1));
             this.gmp_up.updateVel(s, s_dot, y1_dot, this.r1(2));
@@ -192,24 +194,37 @@ classdef DMP_pp < matlab.mixin.Copyable
         function p_ref = getRefPos(this, s)
             
             p_ref = this.gmp.getYd(s);
-            if (s > 1), p_ref = this.prev_state.target; end
+            %if (s > 1), p_ref = this.prev_state.target; end
             
         end
         
         function v_ref = getRefVel(this, s, s_dot)
             
             v_ref = this.gmp.getYdDot(s, s_dot);
-            if (s > 1), v_ref = 0*v_ref; end
+            %if (s > 1), v_ref = 0*v_ref; end
             
         end
         
         function a_ref = getRefAccel(this, s, s_dot, s_ddot)
             
             a_ref = this.gmp.getYdDDot(s, s_dot, s_ddot);
-            if (s > 1), a_ref = 0*a_ref; end
+            %if (s > 1), a_ref = 0*a_ref; end
             
         end
-
+        
+        function f_g = goal_attractor(this, y, y_dot, tau)
+           
+            f_g = this.K*(this.gmp.getGoal() - y) - this.D*y_dot;
+            
+        end
+        
+        function f_s = shape_attractor(this, s, s_dot, s_ddot, tau)
+            
+            %this.K*(this.getRefPos(s) - this.gmp.getGoal())*(s<1)
+            f_s = this.K*(this.getRefPos(s) - this.gmp.getGoal()) + this.D*this.getRefVel(s, s_dot) + this.getRefAccel(s, s_dot, s_ddot);
+            
+        end
+        
         %% for compatibility with GMP_MPC:
         function out = getYd(this, s)
             out = this.getRefPos(s);
@@ -252,6 +267,9 @@ classdef DMP_pp < matlab.mixin.Copyable
     end
     
     properties (Access = public)
+        
+        K % DMP stiffness
+        D % DMP damping
 
         r0
         rf
@@ -263,6 +281,9 @@ classdef DMP_pp < matlab.mixin.Copyable
     end
     
     properties (Access = protected)
+        
+        y
+        y_dot
         
         gmp_up
         

@@ -34,8 +34,8 @@ dt = 0.005; % time step for numerical integration
 
 %% Simulate DMP
 get_target_fun = @(t) g;
-[Time, P_data, dP_data, ddP_data] = simulateModel(gmp, y0, get_target_fun, Tf, dt);
-[Time2, P2_data, dP2_data, ddP2_data] = simulateDMP(gmp, y0, get_target_fun, Tf, dt);
+[Time, P_data, dP_data, ddP_data] = simulateModel(DMP_pp(gmp), dt, Tf, y0, 'get_target_fun',get_target_fun);
+[Time2, P2_data, dP2_data, ddP2_data] = simulateModel(DMP_classic(gmp), dt, Tf, y0, 'get_target_fun',get_target_fun);
 
 toc(t_start)
 

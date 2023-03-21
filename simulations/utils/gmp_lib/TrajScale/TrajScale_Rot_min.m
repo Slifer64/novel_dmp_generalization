@@ -41,8 +41,11 @@ classdef TrajScale_Rot_min < TrajScale
        
         % ------------------------------------------
         
-        function sc = calcScaling(this)
-        
+        function sc = calcScaling(this, Y0, Yg)
+            
+            this.Y0 = Y0;
+            this.Yg = Yg;
+            
             nd = this.Ygd - this.Y0d;  nd = nd/norm(nd);
             n = this.Yg - this.Y0;  n = n/norm(n);
             dot_n_nd = dot(n,nd);

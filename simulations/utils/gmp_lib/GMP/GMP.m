@@ -19,7 +19,7 @@ classdef GMP < GMP_regressor
                 
             if (nargin < 1), n_dofs = 1; end
             if (nargin < 2), N_kernels = 2; end
-            if (nargin < 3), kern_std_scale = 1.0; end
+            if (nargin < 3), kern_std_scale = 1.5; end
             if (nargin < 4), x_min = 0.0; end
             if (nargin < 5), x_max = 1.0; end
             
@@ -40,12 +40,6 @@ classdef GMP < GMP_regressor
 
             this.y_dot = zeros(n_dofs,1);
             this.z_dot = zeros(n_dofs,1);
-            
-            this.gmp_up = GMP_Update(this);
-            this.gmp_up.initExpSigmaw(0.01);
-            %this.gmp_up.initSigmaWfromMsr(0:0.01:1)
-            %this.gmp_up.plotWeightsCovariance(); pause;
-            this.gmp_up.recursiveUpdate(false);
 
         end
 
@@ -78,7 +72,8 @@ classdef GMP < GMP_regressor
         function [train_err, Sw] = train(this, train_method, x, yd_data)
             
             if (~isempty(find(x>1 | x<0)))
-               warning('[GMP::train]: The training timestamps are not normalized...') ;
+               warning('[GMP::train]: The training timestamps are not normalized... Normalizing them in [0 1].');
+               x = (x - min(x)) / (max(x) - min(x));
             end
             
             n_data = length(x);
@@ -148,9 +143,9 @@ classdef GMP < GMP_regressor
         %  @param[in] y0: initial position.
         function setY0(this, y0)
             
-            this.Y0 = y0; 
-            this.traj_sc.setNewStartFinalPos(this.Y0, this.Yg);
-        
+            this.traj_sc.setNewStartFinalPos(y0, this.Yg);
+            this.Y0 = this.traj_sc.getY0();
+            
         end
         
         %% Returns the initial position.
@@ -173,40 +168,10 @@ classdef GMP < GMP_regressor
         %% Set goal/final position.
         %  @param[in] g: goal position.
         function setGoal(this, g)
-            
-            this.Yg = g;
-            this.traj_sc.setNewStartFinalPos(this.Y0, this.Yg);
-        
-        end
-        
-        
-        %% Scales non-linearly the GMP trajectory to the new goal.
-        %  \note: The trajectory scale method must be set to
-        %  TrajScale.None. Otherwise an error is thrown.
-        %  @param[in] g: goal position.
-        %  @param[in] xdot_g: phase variable 1st time derivative at the goal.
-        %  @param[in] s: current state of phase variable as a @GMP_phase object.
-        %  @param[in] y: current position (optional, default='the current position of the model').
-        %  @param[in] y_dot: current velocity (optional, default='the current velocity of the model').
-        function updateGoal(this, g, xdot_g, s, y, y_dot)
-            
-            if (nargin < 5), y = this.getYd(s.x); end
-            if (nargin < 6), y_dot = this.getYdDot(s.x, s.x_dot); end
-                
-            if (this.traj_sc.getScaleType() ~= TrajScale.NONE)
-                error('[GMP::updateGoal]: the scaling method must be ''TrajScale.NONE''');
-            end
 
-            y_ddot = this.getYdDDot(s.x, s.x_dot, s.x_ddot);
-            
-            %this.W = this.W0;
-            sf = GMP_phase(1, xdot_g, 0);
-            s_vec = [s s s sf sf sf];
-            z = [y y_dot y_ddot g zeros(3,2)];
-            type = repmat([GMP_UpdateType.POS GMP_UpdateType.VEL, GMP_UpdateType.ACCEL], 1, 2);
-            r_n = repmat([1e-5 1e-4 1e-3], 1, 2);
-            this.gmp_up.updateWeights(s_vec, z, type, r_n);
-            
+            this.traj_sc.setNewStartFinalPos(this.Y0, g);
+            this.Yg = g;
+        
         end
 
         %% Returns the goal/final position.
@@ -364,7 +329,7 @@ classdef GMP < GMP_regressor
         
         %% ===============================================
         %% ==========  original DMP functions ============
-        %  Deprecated. Use @getYd, @getYdDot, @getYdDDot instead.
+        %  Deprecated. Better use @getYd, @getYdDot, @getYdDDot instead.
         
         %% Calculates the time derivatives of the GMP's states.
         %  @param[in] s: Object of type @GMP_phase.
@@ -460,8 +425,6 @@ classdef GMP < GMP_regressor
     
     properties (Access = public)
         
-        gmp_up
-        
         traj_sc % object of type @TrajScale
         
         %% weights
@@ -476,8 +439,6 @@ classdef GMP < GMP_regressor
     
     properties (Access = {?GMP_Update, ?gmp_})
         
-        
-        
         Y0 % initial position
         Yg % target position
         
@@ -487,8 +448,8 @@ classdef GMP < GMP_regressor
         W0 % initial weights
         
         %% output state
+        %  (deprecated)
         %  Used with @update, @getY, @getZ.
-        %  Deprecated.
         y_dot % position derivative
         z_dot % scaled velocity derivative
         

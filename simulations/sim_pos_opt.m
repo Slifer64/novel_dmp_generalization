@@ -28,7 +28,7 @@ obstacle = [obstacle {PlaneObstacle('point',[0.21; 0.64], 'normal_angle',180, 'c
 
 k_rep = 0.1; % repulsive force gain
 
-adapt_to_ext_signals = 0;
+adapt_to_ext_signals = 1;
 
 %% ========= Train model ===========
 import_gmp_lib();
@@ -79,14 +79,14 @@ model = DMP_pp(gmp);
 
 model.gmp.setScaleMethod(TrajScale_Prop(n_dof));
 model.setOptMetric('pos');
-model.setRecursiveUpdate(false);
+model.setRecursiveUpdate(0);
 
 model.init(s, y0, yg, Tf);
 
 model.setAdaptToRobot(adapt_to_ext_signals);
-model.r1(1) = 1e-0;
-model.r1(2) = 1e2;
-model.r1(3) = 1e3;
+model.r1(1) = 1e0;
+model.r1(2) = 1e4;
+model.r1(3) = 1e4;
 
 % generate nominal trajectory
 s_data = linspace(0,1, 100);

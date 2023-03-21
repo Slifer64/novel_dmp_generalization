@@ -26,7 +26,7 @@ t_start = tic;
 y0d = Pd_data(:,1);   % Initial demo position
 gd = Pd_data(:,end); % Target demo position
 y0 = y0d; % set initial position for execution (for simplicity lets leave it the same as the demo)
-g = gd + 0.4;  % set target position for execution
+g = gd + 1.0;  % set target position for execution
 Tf = Timed(end); % set the time duration of the executed motion
 
 dt = 0.005; % time step for numerical integration
@@ -34,9 +34,8 @@ dt = 0.005; % time step for numerical integration
 %% Simulate DMP
 Ts = 1.0; % target steps every Ts sec
 get_target_fun = @(t) gd + (g-gd)*min([Ts*ceil(t/Ts), Tf])/Tf;
-% get_target_fun = @(t) g;
-[Time, P_data, dP_data, ddP_data, Pg_data] = simulateModel(gmp, y0, get_target_fun, Tf, dt);
-[Time2, P2_data, dP2_data, ddP2_data, Pg2_data] = simulateDMP(gmp, y0, get_target_fun, Tf, dt);
+[Time, P_data, dP_data, ddP_data, Pg_data] = simulateModel(DMP_pp(gmp), dt, Tf, y0, 'get_target_fun', get_target_fun);
+[Time2, P2_data, dP2_data, ddP2_data, Pg2_data] = simulateModel(DMP_classic(gmp), dt, Tf, y0, 'get_target_fun', get_target_fun, 'goal_filt_coeff',10);
 
 toc(t_start)
 

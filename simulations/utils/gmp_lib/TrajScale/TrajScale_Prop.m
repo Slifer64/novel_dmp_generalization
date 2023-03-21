@@ -35,9 +35,11 @@ classdef TrajScale_Prop < TrajScale
     
     methods (Access = protected) % Abstract implementations
 
-        function sc = calcScaling(this)
+        function sc = calcScaling(this, Y0, Yg)
 
-            sc = diag( (this.Yg - this.Y0) ./ (this.Ygd - this.Y0d) );
+            sc = diag( (Yg - Y0) ./ (this.Ygd - this.Y0d) );
+            this.Y0 = Y0;
+            this.Yg = Yg;
             
         end
         

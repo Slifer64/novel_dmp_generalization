@@ -58,11 +58,8 @@ classdef TrajScale < matlab.mixin.Copyable
         %  @param[in] Y0: new start position.
         %  @param[in] Yg: new final position.
         function setNewStartFinalPos(this, Y0, Yg)
-            
-            this.Y0 = Y0;
-            this.Yg = Yg;
-            
-            this.T_sc = this.calcScaling();
+
+            this.T_sc = this.calcScaling(Y0, Yg);
             this.inv_T_sc = this.calcInvScaling();
             
         end
@@ -75,7 +72,7 @@ classdef TrajScale < matlab.mixin.Copyable
             this.Y0d = Y0d;
             this.Ygd = Ygd;
             
-            this.T_sc = this.calcScaling();
+            this.T_sc = this.calcScaling(this.Y0, this.Yg);
             this.inv_T_sc = this.calcInvScaling();
             
         end
@@ -90,6 +87,14 @@ classdef TrajScale < matlab.mixin.Copyable
            
             cp_obj = this.copy();
             
+        end
+        
+        function y0 = getY0(this) 
+            y0 = this.Y0;
+        end
+        
+        function yg = getYg(this) 
+            yg = this.Yg;
         end
         
     end

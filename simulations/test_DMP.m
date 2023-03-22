@@ -13,60 +13,41 @@ Ts = Timed(2) - Timed(1);
 
 %% =============  Create/Train GMP  =============
 n_dof = size(Pd_data, 1); % number of DoFs
+n_kernels = 25;
 
-%% initialize and train GMP
-gmp = GMP(n_dof, 25, 1.5);
-t_start = tic;
-offline_train_mse = gmp.train('LS', Timed/Timed(end), Pd_data);
-offline_train_mse
-toc(t_start)
+dmp_classic = DMP_classic(n_dof, n_kernels);
+classic_mse = dmp_classic.train(Timed, Pd_data, dPd_data, ddPd_data)
 
-%% classical DMP scaling
-classic_traj_sc = TrajScale_Prop(n_dof);
+dmp_rot = DMP_rot(n_dof, n_kernels);
+rot_mse = dmp_rot.train(Timed, Pd_data, dPd_data, ddPd_data)
 
-%% Rot DMP scaling
-rot_traj_sc = TrajScale_Rot_min();
-% rot_traj_sc = TrajScale_Rot_wb();
-% rot_traj_sc.setWorkBenchNormal([0; 0; 1]); % set also the workbench normal
+dmp_bio = DMP_bio(n_dof, n_kernels);
+bio_mse = dmp_bio.train(Timed, Pd_data, dPd_data, ddPd_data)
 
-toc(t_start)
+dmp_bio_plus = DMP_bio_plus(n_dof, n_kernels);
+bio_plus_mse = dmp_bio_plus.train(Timed, Pd_data, dPd_data, ddPd_data)
 
-%% DMP simulation
-disp('Simulation...');
-t_start = tic;
+gmp = GMP(n_dof, n_kernels, 1.5);
+gmp_mse = gmp.train('LS', Timed/Timed(end), Pd_data)
+dmp_pp = DMP_pp(gmp);
 
-%% Initial/Final values
-P0d = Pd_data(:,1);   % Initial demo position
-Pgd = Pd_data(:,end); % Target demo position
-P0 = P0d; % set initial position for execution (for simplicity lets leave it the same as the demo)
-Pg = Pgd + [-0.9; 0.8; -1.6];
+y0d = Pd_data(:, 1);
+gd = Pd_data(:, end);
 
-Tf = Timed(end); % set the time duration of the executed motion
+y0 = y0d;
+g = gd + [0.01; 0.05; 0.8]; %[-0.9; 0.8; -1.6];
+g = 0.5*gd;
+Tf = Timed(end);
+dt = 0.005;
 
-dt = 0.005; % time step for numerical integration
+[Time_cl, P_data_cl, dP_data_cl, ddP_data_cl] = dmp_classic.generate_trajectory(y0, g, Tf, dt);
+[Time_rot, P_data_rot, dP_data_rot, ddP_data_rot] = dmp_rot.generate_trajectory(y0, g, Tf, dt);
 
-sc = TrajScale_Rot_wb();
-sc.setWorkBenchNormal([0 0 1]);
+[Time_bio, P_data_bio, dP_data_bio, ddP_data_bio] = dmp_bio.generate_trajectory(y0, g, Tf, dt);
+[Time_bio_plus, P_data_bio_plus, dP_data_bio_plus, ddP_data_bio_plus] = dmp_bio_plus.generate_trajectory(y0, g, Tf, dt);
 
+[Time, P_data, dP_data, ddP_data] = dmp_pp.generate_trajectory(y0, g, Tf, dt);
 
-%% Execute the DMP
-get_target_fun = @(t) Pg;
-% [Time_cl, P_data_cl, dP_data_cl, ddP_data_cl] = simulateModel(DMP_classic(gmp, classic_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
-% [Time_rot, P_data_rot, dP_data_rot, ddP_data_rot] = simulateModel(DMP_classic(gmp, rot_traj_sc), dt, Tf, P0, 'get_target_fun',get_target_fun);
-% [Time_bio, P_data_bio, dP_data_bio, ddP_data_bio] = simulateBioDMP(dmp_bio, P0, Pg, Tf, dt);
-[Time, P_data, dP_data, ddP_data] = simulateModel(DMP_pp(gmp), dt, Tf, P0, 'get_target_fun',get_target_fun);
-
-% Timed = Time;
-% Pd_data = P_data;
-% dPd_data = dP_data;
-% ddPd_data = ddP_data;
-% 
-% save('data/comp_scalings_data.mat', 'Timed', 'Pd_data', 'dPd_data', 'ddPd_data');
-
-
-% [Time_rd, P_data_rd, dP_data_rd, ddP_data_rd] = simulateModel(DMP_classic(gmp, TrajScale_roto_dial(n_dof)), dt, Tf, P0, 'get_target_fun',get_target_fun);
-
-toc(t_start)
 
 %% Accumulate the results
 dat = {};
@@ -74,29 +55,28 @@ dat = {};
 dat{1} = struct('Time',Time, 'Pos',P_data, 'Vel',dP_data, 'Accel',ddP_data, ...
                 'Color','blue', 'LineStyle','-', 'DisplayName','DMP$^{++}$');
 
-% dat{2} = struct('Time',Time_cl, 'Pos',P_data_cl, 'Vel',dP_data_cl, 'Accel',ddP_data_cl, ...
-%                 'Color','magenta', 'LineStyle',':', 'DisplayName','DMP');
-% 
-% dat{3} = struct('Time',Time_rot, 'Pos',P_data_rot, 'Vel',dP_data_rot, 'Accel',ddP_data_rot, ...
-%                 'Color','cyan', 'LineStyle','-.', 'DisplayName','DMP-rot');
-% 
-% dat{4} = struct('Time',Time_bio, 'Pos',P_data_bio, 'Vel',dP_data_bio, 'Accel',ddP_data_bio, ...
-%                 'Color',[0.85 0.4 0.1], 'LineStyle','-', 'DisplayName','DMP-bio');
-%             
-% dat{5} = struct('Time',Time_rd, 'Pos',P_data_rd, 'Vel',dP_data_rd, 'Accel',ddP_data_rd, ...
-%                 'Color',[0.2 0.8 0.2], 'LineStyle','-', 'DisplayName','DMP-rot-dial');
+dat{2} = struct('Time',Time_cl, 'Pos',P_data_cl, 'Vel',dP_data_cl, 'Accel',ddP_data_cl, ...
+                'Color','magenta', 'LineStyle',':', 'DisplayName','DMP');
+
+dat{3} = struct('Time',Time_rot, 'Pos',P_data_rot, 'Vel',dP_data_rot, 'Accel',ddP_data_rot, ...
+                'Color','cyan', 'LineStyle','-.', 'DisplayName','DMP-rot');
+
+dat{4} = struct('Time',Time_bio, 'Pos',P_data_bio, 'Vel',dP_data_bio, 'Accel',ddP_data_bio, ...
+                'Color',[0.85 0.4 0.1], 'LineStyle','-', 'DisplayName','DMP-bio');
             
+dat{5} = struct('Time',Time_bio_plus, 'Pos',P_data_bio_plus, 'Vel',dP_data_bio_plus, 'Accel',ddP_data_bio_plus, ...
+                'Color',[0.2 0.8 0.2], 'LineStyle','-', 'DisplayName','DMP-bio+');
+
 demo = struct('Time',Timed, 'Pos',Pd_data, 'Vel',dPd_data, 'Accel',ddPd_data, ...
                 'Color',0.5*[1 1 1], 'LineStyle',':', 'DisplayName','demo');
-
+dat{6} = demo;
 
 %% Plot results
-
 % Trajectories
 for i=1:3
     figure;
     subplot(3,1,1); hold on;
-    plot(Time(end), Pg(i), 'LineWidth',4, 'Marker','x', 'MarkerSize',10, 'LineStyle','none', 'Color','red', 'HandleVisibility','off');
+    plot(Tf, g(i), 'LineWidth',4, 'Marker','x', 'MarkerSize',10, 'LineStyle','none', 'Color','red', 'HandleVisibility','off');
     for k=1:length(dat)
         if (isempty(dat{k})), continue; end
         plot(dat{k}.Time, dat{k}.Pos(i,:), 'LineWidth',2.0, 'LineStyle',dat{k}.LineStyle, 'Color',dat{k}.Color, 'DisplayName',dat{k}.DisplayName);
@@ -137,9 +117,9 @@ for k=1:length(dat)
     plot3(dat{k}.Pos(1,:), dat{k}.Pos(2,:), dat{k}.Pos(3,:), 'LineWidth',2.0, 'LineStyle',dat{k}.LineStyle, 'Color',dat{k}.Color, 'DisplayName',dat{k}.DisplayName);
 end
 demo_pl = plot3(demo.Pos(1,:), demo.Pos(2,:), demo.Pos(3,:), 'LineWidth',2.0, 'LineStyle',demo.LineStyle, 'Color',demo.Color, 'HandleVisibility','off');
-p0_pl = plot3(P0(1), P0(2), P0(3), 'LineWidth',4, 'Marker','o', 'MarkerSize',10, 'LineStyle','none', 'Color','green', 'HandleVisibility','off');
-pg_pl = plot3(Pg(1), Pg(2), Pg(3), 'LineWidth',4, 'Marker','x', 'MarkerSize',10, 'LineStyle','none', 'Color','red', 'HandleVisibility','off');
-pgd_pl = plot3(Pgd(1), Pgd(2), Pgd(3), 'LineWidth',4, 'Marker','x', 'MarkerSize',10, 'LineStyle','none', 'Color',[1 0.6 0.6], 'HandleVisibility','off');
+p0_pl = plot3(y0(1), y0(2), y0(3), 'LineWidth',4, 'Marker','o', 'MarkerSize',10, 'LineStyle','none', 'Color','green', 'HandleVisibility','off');
+pg_pl = plot3(g(1), g(2), g(3), 'LineWidth',4, 'Marker','x', 'MarkerSize',10, 'LineStyle','none', 'Color','red', 'HandleVisibility','off');
+pgd_pl = plot3(gd(1), gd(2), gd(3), 'LineWidth',4, 'Marker','x', 'MarkerSize',10, 'LineStyle','none', 'Color',[1 0.6 0.6], 'HandleVisibility','off');
 legend({}, 'interpreter','latex', 'fontsize',17, 'Position',[0.1052 0.9344 0.7555 0.0506], 'Orientation','horizontal', 'Box','off');
 xlabel('$X$ [$m$]', 'interpreter','latex', 'fontsize',17);
 ylabel('$Y$ [$m$]', 'interpreter','latex', 'fontsize',17);

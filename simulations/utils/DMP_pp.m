@@ -238,6 +238,29 @@ classdef DMP_pp < matlab.mixin.Copyable
             n_dof = this.n_dof;
         end
         
+        function [Time, y_data, dy_data, ddy_data] = generate_trajectory(this, y0, g, Tf, dt)
+           
+            Time = 0:dt:Tf;
+            if (Time(end) < Tf), Time = [Time Time(end)+dt]; end
+            
+            this.init(0, y0, g, Tf);
+            
+            y_data = zeros(this.numOfDoFs(), length(Time));
+            dy_data = zeros(size(y_data));
+            ddy_data = zeros(size(y_data));
+
+            s_data = Time / Time(end);
+            s_dot = 1/Tf;
+            s_ddot = 0;
+            for j=1:length(Time)
+                s = s_data(j);
+                y_data(:, j) = this.getRefPos(s);
+                dy_data(:, j) = this.getRefVel(s, s_dot);
+                ddy_data(:, j) = this.getRefAccel(s, s_dot, s_ddot);
+            end
+            
+        end
+        
     end
     
     methods (Access = protected)

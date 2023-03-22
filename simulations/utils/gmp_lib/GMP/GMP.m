@@ -69,7 +69,7 @@ classdef GMP < GMP_regressor
         %  @param[in] yd_data: Matrix with the desired potition for each DoF in each row.
         %  @param[out] train_error: The training error expressed as the mse error.
         %  \note The timestamps-data need not be sequencial temporarily.
-        function [train_err, Sw] = train(this, train_method, x, yd_data)
+        function [train_mse, Sw] = train(this, train_method, x, yd_data)
             
             if (~isempty(find(x>1 | x<0)))
                warning('[GMP::train]: The training timestamps are not normalized... Normalizing them in [0 1].');
@@ -104,9 +104,7 @@ classdef GMP < GMP_regressor
             this.traj_sc.setNewStartFinalPos(this.getY0(), this.getGoal());
 
             if (nargout > 0)
-                train_err = zeros(n_dofs,1);
-                err_data = this.W*H - yd_data;
-                for i=1:n_dofs, train_err(i) = norm(err_data(i,:)); end
+                train_mse = mean((this.W*H - yd_data).^2, 2);
             end
             
             if (nargout > 1), Sw = inv(H*H'); end

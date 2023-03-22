@@ -1,8 +1,8 @@
-classdef DMP_classic < matlab.mixin.Copyable
+classdef DMP_classic_wrapper < matlab.mixin.Copyable
     
     methods (Access = public)
         
-        function this = DMP_classic(gmp, traj_scale)
+        function this = DMP_classic_wrapper(gmp, traj_scale)
             
             if (nargin < 2), traj_scale=TrajScale_Prop(gmp.numOfDoFs()); end
             

@@ -55,7 +55,7 @@ function [Time, Y_data, dY_data, ddY_data, Yg_data] = simulateModel(model, dt, T
         Yg_data = [Yg_data yg_new];
         Yg_filt_data = [Yg_filt_data yg];
 
-        %% Update DMP_pp
+        %% Update model
         model.update(yg, can_sys.s, can_sys.s_dot, y, y_dot);
         
         %% Get reference
@@ -65,11 +65,6 @@ function [Time, Y_data, dY_data, ddY_data, Yg_data] = simulateModel(model, dt, T
 
         % DMP transformation system: 
         y_ddot = model.goal_attractor(y, y_dot, tau) + model.shape_attractor(can_sys.s, can_sys.s_dot, s_ddot, tau) + external_signal;
-        
-%         y_s = model.getRefPos(can_sys.s);
-%         dy_s = model.getRefVel(can_sys.s, can_sys.s_dot);
-%         ddy_s = model.getRefAccel(can_sys.s, can_sys.s_dot, s_ddot);
-%         y_ddot = ddy_s + model.D*(dy_s - y_dot) + model.K*(y_s - y) + external_signal;
 
         %% Stopping criteria
         if (t>=(1.0*t_end+0.05) && norm(y-yg_new)<1e-3 && norm(y_dot)<5e-3)

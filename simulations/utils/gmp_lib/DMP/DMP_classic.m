@@ -8,7 +8,7 @@ classdef DMP_classic < DMP_
         
         function this = DMP_classic(n_dofs, N_kernels)
             
-            this@DMP_(n_dofs, N_kernels, 'diag', 'gaussian', 'linear');
+            this@DMP_(n_dofs, N_kernels, 'spatial_scaling','diag', 'kernel_fun','gaussian', 'gating','linear');
             
         end
 

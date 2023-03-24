@@ -11,17 +11,19 @@ classdef DMP_ < matlab.mixin.Copyable
     
     methods (Access = public)
         
-        function this = DMP_(n_dofs, N_kernels, spatial_scaling, kernel_fun, gating)
+        function this = DMP_(n_dofs, N_kernels, varargin)
             
-            this.K = 400;
-            this.D = 2*sqrt(this.K + 10);
+            args = this.parse_args(varargin{:});
+            
+            this.K = args.K;
+            this.D = args.D;
             this.W = zeros(n_dofs, N_kernels);
             this.c = linspace(0, 1, N_kernels);
-            this.h_scale = 1.0;
+            this.h_scale = args.h_scale;
             
-            this.setKernelFun(kernel_fun);
-            this.setGatingFun(gating);
-            this.setSpatialScaling(spatial_scaling);
+            this.setKernelFun(args.kernel_fun);
+            this.setGatingFun(args.gating);
+            this.setSpatialScaling(args.spatial_scaling);
 
         end
 
@@ -305,6 +307,29 @@ classdef DMP_ < matlab.mixin.Copyable
             psi(i) = exp(-1.0 ./ (1.0 - x(i).^2));
             psi = psi(:);
             
+        end
+        
+        function args = parse_args(varargin)
+
+            parser = inputParser;
+            parser.KeepUnmatched = false;
+            parser.PartialMatching = false;
+            parser.CaseSensitive = false;
+
+            parser.addParameter('spatial_scaling', 'N/A');
+            parser.addParameter('kernel_fun', 'N/A');
+            parser.addParameter('gating', 'N/A');
+            parser.addParameter('h_scale', 1.0);
+            parser.addParameter('K', 400);
+            parser.addParameter('D', []);
+
+            parser.parse(varargin{:});
+            args = parser.Results;
+            
+            if isempty(args.D)
+                args.D = 2*sqrt(args.K + 10);
+            end
+
         end
 
     end

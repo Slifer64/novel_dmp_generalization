@@ -8,7 +8,7 @@ classdef DMP_bio < DMP_
         
         function this = DMP_bio(n_dofs, N_kernels)
             
-            this@DMP_(n_dofs, N_kernels, 'none', 'gaussian', 'linear');
+            this@DMP_(n_dofs, N_kernels, 'spatial_scaling','none', 'kernel_fun','gaussian', 'gating','exp');
             
         end
 

@@ -9,7 +9,7 @@ classdef DMP_rot < DMP_classic
         function this = DMP_rot(n_dofs, N_kernels)
             
             this@DMP_classic(n_dofs, N_kernels);
-            this.setSpatialScaling('rot-wb');
+            this.setSpatialScaling('rot-min');
             
         end
         

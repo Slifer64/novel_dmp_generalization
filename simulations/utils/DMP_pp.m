@@ -6,6 +6,9 @@ classdef DMP_pp < matlab.mixin.Copyable
             
             if (nargin < 2), traj_scale=TrajScale_None(gmp.numOfDoFs()); end
             
+            this.K = 300;
+            this.D = 2*sqrt(this.K + 10);
+            
             this.gmp = gmp.deepCopy();
             this.n_dof = this.gmp.numOfDoFs();
             this.gmp.setScaleMethod(traj_scale);

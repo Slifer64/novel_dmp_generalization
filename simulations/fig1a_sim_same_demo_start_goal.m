@@ -1,5 +1,5 @@
 clc;
-close all;
+% close all;
 clear;
 
 %% =============  includes...  =============
@@ -35,7 +35,10 @@ dt = 0.005; % time step for numerical integration
 %% Simulate DMP
 get_target_fun = @(t) g;
 [Time, P_data, dP_data, ddP_data] = simulateModel(DMP_pp(gmp), dt, Tf, y0, 'get_target_fun',get_target_fun);
-[Time2, P2_data, dP2_data, ddP2_data] = simulateModel(DMP_classic(gmp), dt, Tf, y0, 'get_target_fun',get_target_fun);
+
+dmp_classic = DMP_classic(n_dof, 25);
+classic_mse = dmp_classic.train(Timed, Pd_data, dPd_data, ddPd_data);
+[Time2, P2_data, dP2_data, ddP2_data] = dmp_classic.generate_trajectory(y0, g, Tf, dt);
 
 toc(t_start)
 

@@ -20,7 +20,7 @@ classdef TrajScale_Rot_min < TrajScale
         %% Constructor.
         %  @param[in] n_dof: degrees of freedom.
         function this = TrajScale_Rot_min()
-    
+            
             this@TrajScale(3);
             
         end

@@ -6,6 +6,8 @@ classdef DMP_pp < matlab.mixin.Copyable
             
             if (nargin < 2), traj_scale=TrajScale_None(gmp.numOfDoFs()); end
             
+            this.vp_map = containers.Map();
+            
             this.K = 300;
             this.D = 2*sqrt(this.K + 10);
             
@@ -170,6 +172,41 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.prev_state.initialized = true;
         end
         
+        function updateViapoints(this, s, via_points, vp_name)
+            
+            if this.vp_map.isKey(vp_name)
+                % remove the previous via-points
+                prev_vp = this.vp_map(vp_name);
+                for j=1:length(prev_vp.s)
+                    this.gmp_up.updatePos(prev_vp.s(j), prev_vp.pos(:,j), -this.rv);
+                end
+                this.gmp_up.updateNow();
+            end
+            
+            n_points = size(via_points,2);
+            vp_s = zeros(1, n_points);
+            for j=1:n_points
+                s = this.findClosest(s, 1.0, 60, via_points(:,j));
+                vp_s(j) = s;
+            end
+            this.vp_map(vp_name) = struct('s',vp_s, 'pos',via_points);
+            
+%             dmp_pos = zeros(this.n_dof ,n_points);
+%             for j=1:n_points
+%                dmp_pos(:,j) = this.getRefPos(vp_s(j)); 
+%             end
+%             vp_s
+%             via_points
+%             dmp_pos
+            
+            for j=1:size(via_points,2)
+                this.gmp_up.updatePos(vp_s(j), via_points(:,j), this.rv);
+            end
+            this.gmp_up.updateNow();
+
+        end
+        
+        
         function s = updateViapoint(this, s_v, pos, search_closest, reverse)
         
             if (nargin < 4), search_closest=true; end
@@ -192,7 +229,7 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.gmp_up.updatePos(s, pos, this.rv);
             this.gmp_up.updateNow();
 
-      end
+        end
         
         function p_ref = getRefPos(this, s)
             
@@ -307,6 +344,8 @@ classdef DMP_pp < matlab.mixin.Copyable
     end
     
     properties (Access = protected)
+        
+        vp_map
         
         y
         y_dot

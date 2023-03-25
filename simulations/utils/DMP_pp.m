@@ -316,7 +316,7 @@ classdef DMP_pp < matlab.mixin.Copyable
             i_min = 0;
             for i=1:length(s_data)
                 s = s_data(i);
-                dist = norm(pos - this.gmp.getYd(s));
+                dist = norm(pos - this.getRefPos(s));
                 if (dist < min_dist)
                     i_min = i;
                     min_dist = dist;

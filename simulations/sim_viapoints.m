@@ -19,7 +19,10 @@ gmp = GMP(n_dof, 25);
 gmp_mse = gmp.train('LS', sd_data, Pd_data)
 dmp_pp = DMP_pp(gmp);
 
-model = dmp_pp;
+vmp = VMP(gmp);
+
+% model = dmp_pp;
+model = vmp;
 
 %% =============  Set init/target  =============
 t = 0;
@@ -74,20 +77,26 @@ model.K = 300; % DMP stiffness
 model.D = 2*sqrt(model.K + 10); % DMP damping
 
 target_changed = false;
-target_change_on = true;
+target_change_on = 0*true;
 
 obst_changed = false;
-obst_change_on = true;
+obst_change_on = 0*true;
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.2]);
-pause
+% pause
 
 model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
-model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
+% model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
 
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.4]);
-pause
+% pause
+
+% sv = [0 0.4576 0.5496 1];
+% pv = zeros(n_dof, length(sv));
+% for j=1:length(sv), pv(:,j) = vmp.getRefPos(sv(j)); end
+% plot(pv(1,:), pv(2,:), 'LineStyle','None', 'Marker','o', 'MarkerSize',14, 'LineWidth',3, 'Color','green', 'Parent',ax);
+% pause
 
 while (true)
     
@@ -122,22 +131,16 @@ while (true)
         % for vizualization:
         delete_object(box);
         box = draw_target_box(box_pos, g_viapoints, ax);
-%         drawnow();
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.8]);
-        drawnow();
-        pause(0.001);
 %         pause
     end
     if (obst_changed)
         obst_changed = false; % acknowledged, so disable
         model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
         obst = draw_obstacle(obst_pos, obst_h, obst_w, obst_vp, ax);
-%         drawnow();
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.6]);
-        drawnow();
-        pause(0.001);
 %         pause
         
     end

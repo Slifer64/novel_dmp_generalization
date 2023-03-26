@@ -71,22 +71,24 @@ ddY_data = [];
 
 can_sys = CanonicalSystem(Tf);
 
+model.rf = [1e-11, 1e-7, 1e-7];
 model.rv = 1e-8;
+
 model.init(can_sys.s, y0, g, Tf);
 model.K = 300; % DMP stiffness
 model.D = 2*sqrt(model.K + 10); % DMP damping
 
 target_changed = false;
-target_change_on = 0*true;
+target_change_on = 1*true;
 
 obst_changed = false;
-obst_change_on = 0*true;
+obst_change_on = 1*true;
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.2]);
 % pause
 
 model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
-% model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
+model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
 
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.4]);
@@ -153,6 +155,8 @@ while (true)
     % DMP transformation system: 
     y_ddot = model.goal_attractor(y, y_dot, tau) + model.shape_attractor(can_sys.s, can_sys.s_dot, s_ddot, tau) + external_signal;
     
+    y = model.getRefPos(can_sys.s);
+    
     % vizualization
     dmp_path.XData = [dmp_path.XData y(1)];
     dmp_path.YData = [dmp_path.YData y(2)];
@@ -170,7 +174,7 @@ while (true)
 
     if (t >= 1.4*Tf)
         warning('Time limit exceeded!');
-        break; 
+        break;
     end
 
     %% Numerical integration
@@ -180,6 +184,8 @@ while (true)
     y_dot = y_dot + y_ddot*dt;
     
 end
+
+fprintf('Error: pos=%e , vel=%e, accel=%e \n', norm(y - g), norm(y_dot), norm(y_ddot));
 
 % Trajectories
 ax = {};

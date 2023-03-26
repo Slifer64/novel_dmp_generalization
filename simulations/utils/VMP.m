@@ -51,23 +51,20 @@ classdef VMP < matlab.mixin.Copyable
             
             i1 = 1;
             i2 = length(s_via);
-            for j=1:length(s_via)
-               if (s > s_via(j))
-                   i1 = j;
-                   i2 = j+1;
+            for j=2:length(s_via)
+               if (s_via(j) > s)
+                   i1 = j-1;
+                   i2 = j;
                    break;
                end
             end
-           
 
             s1 = s_via(i1);
             s2 = s_via(i2);
             
-            s
-            s1
-            s2
-            '-----------'
-            pause
+            fprintf('s=%.3f , s1=%.3f, s2=%.3f \n', s, s1, s2);
+            disp('-----------')
+%             if (s > 0.3), pause; end
             
 %             h1 = y - this.gmp.getYd(s1);
 %             h1_dot = y_dot - this.gmp.getYdDot(s1, s_dot);
@@ -90,6 +87,12 @@ classdef VMP < matlab.mixin.Copyable
             if ~any(isnan(h2_ddot)), b = [b h2_ddot]; end
             
             this.a_fifth = b / A;
+            
+            y1_hat = this.getRefPos(s1);
+            y2_hat = this.getRefPos(s2);
+            
+            y1_err = norm(y_via(:,i1) - y1_hat)
+            y2_err = norm(y_via(:,i2) - y2_hat)
             
         end
         
@@ -225,6 +228,7 @@ classdef VMP < matlab.mixin.Copyable
         gmp
         
         rv
+        rf
         
     end
     

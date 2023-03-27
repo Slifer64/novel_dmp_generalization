@@ -24,11 +24,18 @@ classdef VMP < matlab.mixin.Copyable
             this.g = yg;
             this.Tf = Tf;
             
+            s_dot = 1/Tf;
+            y = y0;
+            y_dot = zeros(size(y));
+            
+            this.update(yg, s_start, s_dot, y, y_dot);
+            
         end
             
         function update(this, yg, s, s_dot, y, y_dot)
             
             this.g = yg;
+            s_ddot = 0;
             
             s_via = [0 1];
             y_via = [this.y0 this.g];
@@ -36,11 +43,12 @@ classdef VMP < matlab.mixin.Copyable
             yddot_via = zeros(this.n_dof, 2);
             
             vp_groups = this.vp_map.values();
+            
             for k=1:numel(vp_groups)
                 s_via = [s_via vp_groups{k}.s];
                 y_via = [y_via vp_groups{k}.pos];
-                ydot_via = [y_via vp_groups{k}.vel];
-                yddot_via = [y_via vp_groups{k}.accel];
+                ydot_via = [ydot_via vp_groups{k}.vel];
+                yddot_via = [yddot_via vp_groups{k}.accel];
             end
             
             [~, ind] = sort(s_via);
@@ -62,41 +70,42 @@ classdef VMP < matlab.mixin.Copyable
             s1 = s_via(i1);
             s2 = s_via(i2);
             
-            fprintf('s=%.3f , s1=%.3f, s2=%.3f \n', s, s1, s2);
-            disp('-----------')
-%             if (s > 0.3), pause; end
-            
-%             h1 = y - this.gmp.getYd(s1);
-%             h1_dot = y_dot - this.gmp.getYdDot(s1, s_dot);
+%             fprintf('s=%.3f , s1=%.3f, s2=%.3f \n', s, s1, s2);
+%             disp('-----------')
+
             h1 = y_via(:,i1) - this.gmp.getYd(s1);
             h1_dot = ydot_via(:,i1) - this.gmp.getYdDot(s1, s_dot);
-            h1_ddot = yddot_via(:,i1) - this.gmp.getYdDDot(s1, s_dot, 0);
+            h1_ddot = yddot_via(:,i1) - this.gmp.getYdDDot(s1, s_dot, s_ddot);
+            
+%             h1 = this.getRefPos(s);
+%             h1_dot = this.getRefVel(s, s_dot);
+%             h1_ddot = this.getRefAccel(s, s_dot, s_ddot);
             
             h2 = y_via(:,i2) - this.gmp.getYd(s2);
             h2_dot = ydot_via(:,i2) - this.gmp.getYdDot(s2, s_dot);
-            h2_ddot = yddot_via(:,i2) - this.gmp.getYdDDot(s2, s_dot, 0);
+            h2_ddot = yddot_via(:,i2) - this.gmp.getYdDDot(s2, s_dot, s_ddot);
             
-            A1 = this.fifth_pol_mat(s1, 1, ~any(isnan(h1_dot)), ~any(isnan(h1_ddot)));
-            A2 = this.fifth_pol_mat(s2, 1, ~any(isnan(h2_dot)), ~any(isnan(h2_ddot)));
+            A1 = this.fifth_pol_mat(s1, s_dot, s_ddot, 1, ~any(isnan(h1_dot(:))), ~any(isnan(h1_ddot(:))));
+            A2 = this.fifth_pol_mat(s2, s_dot, s_ddot, 1, ~any(isnan(h2_dot(:))), ~any(isnan(h2_ddot(:))));
             A = [A1 A2];
             b = h1;
-            if ~any(isnan(h1_dot)), b = [b h1_dot]; end
-            if ~any(isnan(h1_ddot)), b = [b h1_ddot]; end
+            if ~any(isnan(h1_dot(:))), b = [b h1_dot]; end
+            if ~any(isnan(h1_ddot(:))), b = [b h1_ddot]; end
             b = [b h2];
-            if ~any(isnan(h2_dot)), b = [b h2_dot]; end
-            if ~any(isnan(h2_ddot)), b = [b h2_ddot]; end
+            if ~any(isnan(h2_dot(:))), b = [b h2_dot]; end
+            if ~any(isnan(h2_ddot(:))), b = [b h2_ddot]; end
             
             this.a_fifth = b / A;
             
-            y1_hat = this.getRefPos(s1);
-            y2_hat = this.getRefPos(s2);
-            
-            y1_err = norm(y_via(:,i1) - y1_hat)
-            y2_err = norm(y_via(:,i2) - y2_hat)
+%             y1_hat = this.getRefPos(s1);
+%             y2_hat = this.getRefPos(s2);
+%             
+%             y1_err = norm(y_via(:,i1) - y1_hat)
+%             y2_err = norm(y_via(:,i2) - y2_hat)
             
         end
         
-        function A = fifth_pol_mat(this, s, pos, vel, accel)
+        function A = fifth_pol_mat(this, s, s_dot, s_ddot, pos, vel, accel)
             
             A = [];
             
@@ -105,11 +114,13 @@ classdef VMP < matlab.mixin.Copyable
             end
             
             if (vel)
-                A = [A; [0  1  2*s   3*s^2   4*s^3    5*s^4]];
+                phi = [0  1  2*s   3*s^2   4*s^3    5*s^4]*s_dot;
+                A = [A; phi];
             end
             
             if (accel)
-                A = [A; [0  0  2     6*s    12*s^2   20*s^3]];
+                phi = [0  0  2     6*s    12*s^2   20*s^3]*s_dot + [0  1  2*s   3*s^2   4*s^3    5*s^4]*s_ddot;
+                A = [A; phi];
             end
             
             A = A';
@@ -118,6 +129,9 @@ classdef VMP < matlab.mixin.Copyable
         
         function updateViapoints(this, s, vp_pos, vp_name)
             
+            s_dot = 1/this.Tf;
+            s_ddot = 0;
+            
             n_points = size(vp_pos,2);
             vp_s = zeros(1, n_points);
             vp_vel = nan(this.n_dof, n_points);
@@ -125,11 +139,19 @@ classdef VMP < matlab.mixin.Copyable
             for j=1:n_points
                 s = this.findClosest(s, 1.0, 60, vp_pos(:,j));
                 vp_s(j) = s;
-                vp_vel(:,j) = this.getRefVel(s, 1/this.Tf);
-                vp_accel(:,j) = this.getRefAccel(s, 1/this.Tf, 0);
+%                 vp_vel(:,j) = nan(this.n_dof,1);
+%                 vp_accel(:,j) = nan(this.n_dof,1);
+                vp_vel(:,j) = this.getRefVel(s, s_dot);
+                vp_accel(:,j) = this.getRefAccel(s, s_dot, s_ddot);
+%                 vp_vel(:,j) = this.gmp.getYdDot(s, s_dot);
+%                 vp_accel(:,j) = this.gmp.getYdDDot(s, s_dot, s_ddot);
             end
             this.vp_map(vp_name) = struct('s',vp_s, 'pos',vp_pos, 'vel',vp_vel, 'accel',vp_accel);
-
+            
+%             s_dot = 1/this.Tf;
+%             y = this.getRefPos(s);
+%             y_dot = this.getRefVel(s, s_dot);
+%             this.update(this.g, s, s_dot, y, y_dot);
         end
         
         function p_ref = getRefPos(this, s)
@@ -141,14 +163,14 @@ classdef VMP < matlab.mixin.Copyable
         
         function v_ref = getRefVel(this, s, s_dot)
             
-            t_fifth = [0 1 2*s 3*s^2 4*s^3 5*s^4]';
+            t_fifth = [0 1 2*s 3*s^2 4*s^3 5*s^4]'*s_dot;
             v_ref = this.gmp.getYdDot(s, s_dot)  + this.a_fifth*t_fifth;
             
         end
         
         function a_ref = getRefAccel(this, s, s_dot, s_ddot)
             
-            t_fifth = [0 0 2 6*s 12*s^2 20*s^3]';
+            t_fifth = [0 0 2 6*s 12*s^2 20*s^3]'*s_dot + [0 1 2*s 3*s^2 4*s^3 5*s^4]'*s_ddot;
             a_ref = this.gmp.getYdDDot(s, s_dot, s_ddot)  + this.a_fifth*t_fifth;
             
         end
@@ -229,12 +251,14 @@ classdef VMP < matlab.mixin.Copyable
         
         rv
         rf
+        r1
+        
+        vp_map
         
     end
     
     properties (Access = protected)
         
-        vp_map
         n_dof
         
         y0

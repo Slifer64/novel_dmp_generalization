@@ -1,5 +1,5 @@
 clc;
-close all;
+% close all;
 clear;
 
 %% =============  includes...  =============
@@ -26,7 +26,7 @@ model = vmp;
 
 %% =============  Set init/target  =============
 t = 0;
-Tf = 5;
+Tf = 6;
 tau = Tf;
 dt = 0.005;
 
@@ -73,23 +73,24 @@ can_sys = CanonicalSystem(Tf);
 
 model.rf = [1e-11, 1e-7, 1e-7];
 model.rv = 1e-8;
+model.r1 = [1e-7, 1e-7, 1e-6];
 
 model.init(can_sys.s, y0, g, Tf);
 model.K = 300; % DMP stiffness
 model.D = 2*sqrt(model.K + 10); % DMP damping
 
 target_changed = false;
-target_change_on = 1*true;
+target_change_on = 0*true;
 
 obst_changed = false;
-obst_change_on = 1*true;
+obst_change_on = 0*true;
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.2]);
 % pause
 
 model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
 model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
-
+% model.update(g, can_sys.s, can_sys.s_dot, y, y_dot);
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.4]);
 % pause
@@ -109,7 +110,7 @@ while (true)
     ddY_data = [ddY_data y_ddot];
         
     % simulate obstacle or target changes, e.g. tracked through vision
-    if (obst_change_on && t > 1.5)
+    if (obst_change_on && t > 0.3*Tf)
         obst_change_on = false; % turn off, to not enter again
         obst_changed = true;
         delete_object(obst);
@@ -117,7 +118,7 @@ while (true)
         obst_vp = obst_pos + obst_vp_offsets;
     end
     
-    if (target_change_on && t > 2.5)
+    if (target_change_on && t > 0.5*Tf)
         target_change_on = false; % turn off, to not enter again
         target_changed = true;
         box_pos = box_pos + [0.2; 0.15];
@@ -130,6 +131,7 @@ while (true)
     if (target_changed)
         target_changed = false; % acknowledged, so disable
         model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
+        model.update(g, can_sys.s, can_sys.s_dot, y, y_dot);
         % for vizualization:
         delete_object(box);
         box = draw_target_box(box_pos, g_viapoints, ax);
@@ -140,11 +142,11 @@ while (true)
     if (obst_changed)
         obst_changed = false; % acknowledged, so disable
         model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
+        model.update(g, can_sys.s, can_sys.s_dot, y, y_dot);
         obst = draw_obstacle(obst_pos, obst_h, obst_w, obst_vp, ax);
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.6]);
 %         pause
-        
     end
 
     %% Get reference
@@ -155,7 +157,7 @@ while (true)
     % DMP transformation system: 
     y_ddot = model.goal_attractor(y, y_dot, tau) + model.shape_attractor(can_sys.s, can_sys.s_dot, s_ddot, tau) + external_signal;
     
-    y = model.getRefPos(can_sys.s);
+%     y = model.getRefPos(can_sys.s);
     
     % vizualization
     dmp_path.XData = [dmp_path.XData y(1)];
@@ -189,24 +191,22 @@ fprintf('Error: pos=%e , vel=%e, accel=%e \n', norm(y - g), norm(y_dot), norm(y_
 
 % Trajectories
 ax = {};
-for i=1:2
-    figure;
-    ax{1} = subplot(2,1,1); hold on;  grid on;
-    plot(Time, dY_data(i,:), 'LineWidth',2.0, 'Color', 'green');
-    ylabel('vel [$m/s$]', 'interpreter','latex', 'fontsize',15);
-    axis tight;
-    hold off;
+figure;
+ax{1} = subplot(2,1,1); hold on;  grid on;
+plot(Time, vecnorm(dY_data, 2, 1), 'LineWidth',2.0, 'Color', 'green');
+ylabel('vel [$m/s$]', 'interpreter','latex', 'fontsize',15);
+axis tight;
+hold off;
 
-    ax{2} = subplot(2,1,2); hold on;  grid on;
-    plot(Time, ddY_data(i,:), 'LineWidth',2.0, 'Color', 'red');
-    ylabel('accel [$m/s^2$]', 'interpreter','latex', 'fontsize',15);
-    axis tight;
-    hold off;
-    
-    for j=1:length(ax)
-        ax{j}.XLim = ax{j}.XLim + 0.01*(ax{j}.XLim(2) - ax{j}.XLim(1)) * [0 1];
-        ax{j}.YLim = ax{j}.YLim + 0.02*(ax{j}.YLim(2) - ax{j}.YLim(1)) * [-1 1];
-    end
+ax{2} = subplot(2,1,2); hold on;  grid on;
+plot(Time, vecnorm(ddY_data, 2, 1), 'LineWidth',2.0, 'Color', 'red');
+ylabel('accel [$m/s^2$]', 'interpreter','latex', 'fontsize',15);
+axis tight;
+hold off;
+
+for j=1:length(ax)
+    ax{j}.XLim = ax{j}.XLim + 0.01*(ax{j}.XLim(2) - ax{j}.XLim(1)) * [0 1];
+    ax{j}.YLim = ax{j}.YLim + 0.02*(ax{j}.YLim(2) - ax{j}.YLim(1)) * [-1 1];
 end
 
 
@@ -264,7 +264,7 @@ function obst_handles = draw_obstacle(center, height, width, obst_vp, ax)
 
     % Plot the filled rectangle
     h1 = fill(x_vals, y_vals, 'r');
-    set(h1, 'LineStyle','none', 'FaceColor',0.5*[1 1 1], 'Parent',ax);
+    set(h1, 'LineStyle','none', 'FaceColor',0.5*[1 1 1], 'FaceAlpha',0.6, 'Parent',ax);
     
     h2 = plot(obst_vp(1,:), obst_vp(2,:), 'LineStyle','None', 'Marker','*', 'MarkerSize',14, 'LineWidth',2, 'Color','magenta', 'Parent',ax);
     

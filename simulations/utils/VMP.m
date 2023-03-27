@@ -78,6 +78,10 @@ classdef VMP < matlab.mixin.Copyable
             ydot_via = ydot_via(:, ind);
             yddot_via = yddot_via(:, ind);
             
+            s_via
+            y_via
+            pause
+            
             i1 = 1;
             i2 = length(s_via);
             for j=2:length(s_via)

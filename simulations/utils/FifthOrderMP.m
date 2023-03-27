@@ -30,6 +30,8 @@ classdef FifthOrderMP < matlab.mixin.Copyable
             err_1 = vecnorm(this.a_fifth * A - b, 2, 1);
             
 %             disp('--------------------')
+%             s1
+%             A
 %             err_0
 %             err_1
 %             pause

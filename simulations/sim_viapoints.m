@@ -1,5 +1,5 @@
 clc;
-% close all;
+close all;
 clear;
 
 %% =============  includes...  =============
@@ -50,11 +50,12 @@ ax.XLim = [-0.05 1.2];
 ax.YLim = [-0.05 0.6];
 obst = draw_obstacle(obst_pos, obst_h, obst_w, obst_vp, ax);
 
-box = draw_target_box(box_pos, g_viapoints, ax);
+target_box = draw_target_box(box_pos, g_viapoints, ax);
 
 plot(y0(1), y0(2), 'LineStyle','None', 'Marker','o', 'MarkerSize',14, 'LineWidth',3, 'Color','green', 'Parent',ax);
 
 dmp_path = plot(nan, nan, 'LineStyle','-', 'LineWidth',2, 'Color','blue', 'Parent',ax);
+ref_path = plot(nan, nan, 'LineStyle',':', 'LineWidth',2, 'Color','cyan', 'Parent',ax);
 
 plot_every = 2;
 plot_count = 0;
@@ -80,10 +81,10 @@ model.K = 300; % DMP stiffness
 model.D = 2*sqrt(model.K + 10); % DMP damping
 
 target_changed = false;
-target_change_on = 0*true;
+target_change_on = 1*true;
 
 obst_changed = false;
-obst_change_on = 0*true;
+obst_change_on = 1*true;
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.2]);
 % pause
@@ -132,8 +133,8 @@ while (true)
         target_changed = false; % acknowledged, so disable
         model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
         % for vizualization:
-        delete_object(box);
-        box = draw_target_box(box_pos, g_viapoints, ax);
+        delete_object(target_box);
+        target_box = draw_target_box(box_pos, g_viapoints, ax);
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.8]);
 %         pause
@@ -155,11 +156,15 @@ while (true)
     % DMP transformation system: 
     y_ddot = model.goal_attractor(y, y_dot, tau) + model.shape_attractor(can_sys.s, can_sys.s_dot, s_ddot, tau) + external_signal;
     
-%     y = model.getRefPos(can_sys.s);
+    y_ref = model.getRefPos(can_sys.s);
     
     % vizualization
     dmp_path.XData = [dmp_path.XData y(1)];
     dmp_path.YData = [dmp_path.YData y(2)];
+    
+    ref_path.XData = [ref_path.XData y_ref(1)];
+    ref_path.YData = [ref_path.YData y_ref(2)];
+    
     plot_count = plot_count + 1;
     if (plot_count == plot_every)
         plot_count = 0;
@@ -194,12 +199,14 @@ ax{1} = subplot(2,1,1); hold on;  grid on;
 plot(Time, vecnorm(dY_data, 2, 1), 'LineWidth',2.0, 'Color', 'green');
 ylabel('vel [$m/s$]', 'interpreter','latex', 'fontsize',15);
 axis tight;
+box on;
 hold off;
 
 ax{2} = subplot(2,1,2); hold on;  grid on;
 plot(Time, vecnorm(ddY_data, 2, 1), 'LineWidth',2.0, 'Color', 'red');
 ylabel('accel [$m/s^2$]', 'interpreter','latex', 'fontsize',15);
 axis tight;
+box on;
 hold off;
 
 for j=1:length(ax)

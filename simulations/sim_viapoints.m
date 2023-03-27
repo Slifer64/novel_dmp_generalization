@@ -80,10 +80,10 @@ model.K = 300; % DMP stiffness
 model.D = 2*sqrt(model.K + 10); % DMP damping
 
 target_changed = false;
-target_change_on = 1*true;
+target_change_on = 0*true;
 
 obst_changed = false;
-obst_change_on = 1*true;
+obst_change_on = 0*true;
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.2]);
 % pause

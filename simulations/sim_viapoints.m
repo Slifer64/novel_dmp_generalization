@@ -80,10 +80,10 @@ model.K = 300; % DMP stiffness
 model.D = 2*sqrt(model.K + 10); % DMP damping
 
 target_changed = false;
-target_change_on = 0*true;
+target_change_on = 1*true;
 
 obst_changed = false;
-obst_change_on = 0*true;
+obst_change_on = 1*true;
 
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.2]);
 % pause
@@ -131,7 +131,6 @@ while (true)
     if (target_changed)
         target_changed = false; % acknowledged, so disable
         model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
-        model.update(g, can_sys.s, can_sys.s_dot, y, y_dot);
         % for vizualization:
         delete_object(box);
         box = draw_target_box(box_pos, g_viapoints, ax);
@@ -142,7 +141,6 @@ while (true)
     if (obst_changed)
         obst_changed = false; % acknowledged, so disable
         model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
-        model.update(g, can_sys.s, can_sys.s_dot, y, y_dot);
         obst = draw_obstacle(obst_pos, obst_h, obst_w, obst_vp, ax);
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.6]);

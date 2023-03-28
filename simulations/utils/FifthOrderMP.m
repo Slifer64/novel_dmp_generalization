@@ -61,7 +61,7 @@ classdef FifthOrderMP < matlab.mixin.Copyable
         
         function phi_ddot = fifth_phi_ddot(this, s, s_dot, s_ddot)
             
-            phi_ddot = [0 0 2 6*s 12*s^2 20*s^3]'*s_dot + [0 1 2*s 3*s^2 4*s^3 5*s^4]'*s_ddot;
+            phi_ddot = [0 0 2 6*s 12*s^2 20*s^3]'*s_dot^2 + [0 1 2*s 3*s^2 4*s^3 5*s^4]'*s_ddot;
             
         end
         

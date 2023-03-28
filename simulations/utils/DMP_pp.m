@@ -172,7 +172,7 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.prev_state.initialized = true;
         end
         
-        function updateViapoints(this, s, via_points, vp_name)
+        function vp_s = updateViapoints(this, s, via_points, vp_name)
             
             if this.vp_map.isKey(vp_name)
                 % remove the previous via-points

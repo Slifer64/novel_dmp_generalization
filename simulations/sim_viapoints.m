@@ -1,5 +1,5 @@
 clc;
-close all;
+% close all;
 clear;
 
 %% =============  includes...  =============
@@ -21,43 +21,59 @@ dmp_pp = DMP_pp(gmp);
 
 vmp = VMP(gmp);
 
-% model = dmp_pp;
-model = vmp;
+model = dmp_pp;
+model_color = [0 0 1];
+
+% model = vmp;
+% model_color = [0.85 0.33 0.1];
 
 %% =============  Set init/target  =============
 t = 0;
 Tf = 6;
 tau = Tf;
-dt = 0.005;
+dt = 0.004;
 
 box_pos = [0.9; 0];
+box_h = 0.25;
+box_w = 0.1;
+box_offset = [0.25; 0.1];
+t_box_change = 0.5*Tf;
+target_changed = false;
+target_change_on = 1*true;
 g = box_pos;
-g_vp_offsets = [0.18 0.12 0.06];
+g_vp_offsets = [0.24 0.12];
 g_viapoints = g + [zeros(size(g_vp_offsets)); g_vp_offsets];
 
 obst_pos = [0.5; 0];
 obst_h = 0.35;
 obst_w = 0.2;
-obst_vp_offsets = [-obst_w/2, obst_w/2; obst_h + 0.05, obst_h + 0.05];
+obst_offset = [0.15; 0.2];
+t_obst_change = 0.3*Tf;
+obst_changed = false;
+obst_change_on = 1*true;
+obst_vp_offsets = [ [-obst_w/2, obst_h + 0.05];
+%                     [        0,      obst_h + 0.07];
+                    [obst_w/2,  obst_h + 0.05]
+                  ]';
 obst_vp = obst_pos + obst_vp_offsets;
 y0 = [0; 0];
 
 
 %% =============  Set up vizualization environment  =============
 fig = figure;
-ax = axes(); hold(ax, 'on'); grid(ax, 'on'); axis(ax, 'equal');
+ax = axes(); hold(ax, 'on'); grid(ax, 'on'); axis(ax, 'equal'); box(ax, 'on');
 ax.XLim = [-0.05 1.2];
-ax.YLim = [-0.05 0.6];
+ax.YLim = [-0.05 0.7];
 obst = draw_obstacle(obst_pos, obst_h, obst_w, obst_vp, ax);
 
-target_box = draw_target_box(box_pos, g_viapoints, ax);
+target_box = draw_target_box(box_pos, box_h, box_w, g_viapoints, ax);
 
 plot(y0(1), y0(2), 'LineStyle','None', 'Marker','o', 'MarkerSize',14, 'LineWidth',3, 'Color','green', 'Parent',ax);
 
-dmp_path = plot(nan, nan, 'LineStyle','-', 'LineWidth',2, 'Color','blue', 'Parent',ax);
+dmp_path = plot(nan, nan, 'LineStyle','-', 'LineWidth',2, 'Color',model_color, 'Parent',ax);
 ref_path = plot(nan, nan, 'LineStyle',':', 'LineWidth',2, 'Color','cyan', 'Parent',ax);
 
-plot_every = 2;
+plot_every = 4;
 plot_count = 0;
 
 %% =============  Run simulation  =============
@@ -80,20 +96,13 @@ model.init(can_sys.s, y0, g, Tf);
 model.K = 300; % DMP stiffness
 model.D = 2*sqrt(model.K + 10); % DMP damping
 
-target_changed = false;
-target_change_on = 1*true;
-
-obst_changed = false;
-obst_change_on = 1*true;
-
 plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.2]);
 % pause
 
 model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
 model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
-% model.update(g, can_sys.s, can_sys.s_dot, y, y_dot);
 
-plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.4]);
+plot_future_path(model, can_sys.s, ax, 'color',[0.5 0.5 1]);
 % pause
 
 % sv = [0 0.4576 0.5496 1];
@@ -101,6 +110,8 @@ plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.4]);
 % for j=1:length(sv), pv(:,j) = vmp.getRefPos(sv(j)); end
 % plot(pv(1,:), pv(2,:), 'LineStyle','None', 'Marker','o', 'MarkerSize',14, 'LineWidth',3, 'Color','green', 'Parent',ax);
 % pause
+
+% model.gmp.W = 0*model.gmp.W;
 
 while (true)
     
@@ -111,18 +122,18 @@ while (true)
     ddY_data = [ddY_data y_ddot];
         
     % simulate obstacle or target changes, e.g. tracked through vision
-    if (obst_change_on && t > 0.3*Tf)
+    if (obst_change_on && t > t_obst_change)
         obst_change_on = false; % turn off, to not enter again
         obst_changed = true;
         delete_object(obst);
-        obst_pos = obst_pos + [0.1; 0.15];
+        obst_pos = obst_pos + obst_offset;
         obst_vp = obst_pos + obst_vp_offsets;
     end
     
-    if (target_change_on && t > 0.5*Tf)
+    if (target_change_on && t > t_box_change)
         target_change_on = false; % turn off, to not enter again
         target_changed = true;
-        box_pos = box_pos + [0.2; 0.15];
+        box_pos = box_pos + box_offset;
         g = box_pos;
         g_viapoints = g + [zeros(size(g_vp_offsets)); g_vp_offsets];
     end
@@ -134,7 +145,7 @@ while (true)
         model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
         % for vizualization:
         delete_object(target_box);
-        target_box = draw_target_box(box_pos, g_viapoints, ax);
+        target_box = draw_target_box(box_pos, box_h, box_w, g_viapoints, ax);
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.8]);
 %         pause
@@ -157,13 +168,21 @@ while (true)
     y_ddot = model.goal_attractor(y, y_dot, tau) + model.shape_attractor(can_sys.s, can_sys.s_dot, s_ddot, tau) + external_signal;
     
     y_ref = model.getRefPos(can_sys.s);
+    dy_ref = model.getRefVel(can_sys.s, can_sys.s_dot);
+    ddy_ref = model.getRefAccel(can_sys.s, can_sys.s_dot, s_ddot);
+    
+    if isequal(class(model),'VMP')
+        y_ddot = ddy_ref;
+        y_dot = dy_ref;
+        y = y_ref;
+    end
     
     % vizualization
     dmp_path.XData = [dmp_path.XData y(1)];
     dmp_path.YData = [dmp_path.YData y(2)];
     
-    ref_path.XData = [ref_path.XData y_ref(1)];
-    ref_path.YData = [ref_path.YData y_ref(2)];
+%     ref_path.XData = [ref_path.XData y_ref(1)];
+%     ref_path.YData = [ref_path.YData y_ref(2)];
     
     plot_count = plot_count + 1;
     if (plot_count == plot_every)
@@ -190,20 +209,42 @@ while (true)
     
 end
 
+s_data = Time / Time(end);
+Yd_data = zeros(n_dof, length(s_data));
+dYd_data = zeros(size(Yd_data));
+ddYd_data = zeros(size(Yd_data));
+for j=1:length(s_data)
+    Yd_data(:, j) = gmp.getYd(s_data(j));
+    dYd_data(:, j) = gmp.getYdDot(s_data(j), 1/Tf);
+    ddYd_data(:, j) = gmp.getYdDDot(s_data(j), 1/Tf, 0);
+end
+pd_plt = plot(Yd_data(1,:), Yd_data(2,:), 'color',[0.0 0.9 0.0], 'LineStyle','-.', 'LineWidth',2, 'Parent',ax);
+scatter(ax, Yd_data(1,end), Yd_data(2,end), 'Marker','x', 'SizeData',170, 'LineWidth',2.5, 'MarkerEdgeColor',[1 0.5 0.5]);
+
 fprintf('Error: pos=%e , vel=%e, accel=%e \n', norm(y - g), norm(y_dot), norm(y_ddot));
+
+dY2_data = dY_data;
+ddY2_data = ddY_data;
+
+dY_data = [diff(Y_data, 1, 2) ./ diff(Time) zeros(n_dof,1)];
+ddY_data = [diff(dY_data, 1, 2) ./ diff(Time) zeros(n_dof,1)];
 
 % Trajectories
 ax = {};
 figure;
 ax{1} = subplot(2,1,1); hold on;  grid on;
-plot(Time, vecnorm(dY_data, 2, 1), 'LineWidth',2.0, 'Color', 'green');
+plot(Time, vecnorm(dY_data, 2, 1), 'LineWidth',2.0, 'Color', dmp_path.Color);
+plot(Time, vecnorm(dYd_data, 2, 1), 'LineWidth',2.0, 'Color', pd_plt.Color, 'LineStyle',pd_plt.LineStyle);
+% plot(Time, vecnorm(dY2_data, 2, 1), 'LineWidth',2.0, 'Color', 'magenta', 'LineStyle','--');
 ylabel('vel [$m/s$]', 'interpreter','latex', 'fontsize',15);
 axis tight;
 box on;
 hold off;
 
 ax{2} = subplot(2,1,2); hold on;  grid on;
-plot(Time, vecnorm(ddY_data, 2, 1), 'LineWidth',2.0, 'Color', 'red');
+plot(Time, vecnorm(ddY_data, 2, 1), 'LineWidth',2.0, 'Color', dmp_path.Color);
+plot(Time, vecnorm(ddYd_data, 2, 1), 'LineWidth',2.0, 'Color', pd_plt.Color, 'LineStyle',pd_plt.LineStyle);
+% plot(Time, vecnorm(ddY2_data, 2, 1), 'LineWidth',2.0, 'Color', 'magenta', 'LineStyle','--');
 ylabel('accel [$m/s^2$]', 'interpreter','latex', 'fontsize',15);
 axis tight;
 box on;
@@ -238,21 +279,21 @@ function h = plot_future_path(model, s, ax, varargin)
     set(h, varargin{:});
 end
 
-function plt_handles = draw_target_box(c, g_viapoints, ax)
+function plt_handles = draw_target_box(c, h, w, g_viapoints, ax)
     
     g = c;
     c(2) = c(2) - 0.02;
-    h = 0.2;
-    w = 0.1;
+%     h = 0.2;
+%     w = 0.1;
     lw = 4;
-    color = [0.85, 0.33, 0.1];
+    color = 0.6*[1 1 1];
     h1 = plot([c(1)-w/2, c(1)+w/2], [c(2) c(2)], 'LineWidth',lw, 'Color',color, 'Parent',ax);
     h2 = plot([c(1)-w/2, c(1)-w/2], [c(2) c(2)+h], 'LineWidth',lw, 'Color',color, 'Parent',ax);
     h3 = plot([c(1)+w/2, c(1)+w/2], [c(2) c(2)+h], 'LineWidth',lw, 'Color',color, 'Parent',ax);
     
-    h4 = plot(g(1), g(2), 'LineStyle','None', 'Marker','x', 'MarkerSize',14, 'LineWidth',3, 'Color','red', 'Parent',ax);
+    h4 = scatter(ax, g(1), g(2), 'Marker','x', 'SizeData',170, 'LineWidth',2.5, 'MarkerEdgeColor','red');
     
-    h5 = plot(g_viapoints(1,:), g_viapoints(2,:), 'LineStyle','None', 'Marker','*', 'MarkerSize',14, 'LineWidth',2, 'Color','magenta', 'Parent',ax);
+    h5 = scatter(ax, g_viapoints(1,:), g_viapoints(2,:), 'Marker','*', 'SizeData',170, 'LineWidth',1.5, 'MarkerEdgeColor','magenta');
     
     plt_handles = [h1 h2 h3 h4 h5];
 end
@@ -271,7 +312,7 @@ function obst_handles = draw_obstacle(center, height, width, obst_vp, ax)
     h1 = fill(x_vals, y_vals, 'r');
     set(h1, 'LineStyle','none', 'FaceColor',0.5*[1 1 1], 'FaceAlpha',0.6, 'Parent',ax);
     
-    h2 = plot(obst_vp(1,:), obst_vp(2,:), 'LineStyle','None', 'Marker','*', 'MarkerSize',14, 'LineWidth',2, 'Color','magenta', 'Parent',ax);
+    h2 = scatter(ax, obst_vp(1,:), obst_vp(2,:), 'Marker','*', 'SizeData',170, 'LineWidth',1.5, 'MarkerEdgeColor','magenta');
     
     obst_handles = [h1 h2];
 end

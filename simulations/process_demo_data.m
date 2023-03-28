@@ -6,6 +6,10 @@ load('utils/data1.mat', 'sd_data', 'Pd_data');
 s1_data = sd_data;
 P1_data = Pd_data;
 
+save('data/vp_demo2.mat', 'sd_data', 'Pd_data');
+return
+
+
 load('utils/data2.mat', 'sd_data', 'Pd_data');
 s2_data = sd_data;
 P2_data = Pd_data;

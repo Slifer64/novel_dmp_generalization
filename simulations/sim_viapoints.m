@@ -62,8 +62,10 @@ y0 = [0; 0];
 %% =============  Set up vizualization environment  =============
 fig = figure;
 ax = axes(); hold(ax, 'on'); grid(ax, 'on'); axis(ax, 'equal'); box(ax, 'on');
-ax.XLim = [-0.05 1.2];
+ax.XLim = [-0.05 1.25];
 ax.YLim = [-0.05 0.7];
+xlabel('X [$m$]', 'interpreter','latex', 'fontsize',15, 'Parent',ax);
+ylabel('Y [$m$]', 'interpreter','latex', 'fontsize',15, 'Parent',ax);
 obst = draw_obstacle(obst_pos, obst_h, obst_w, obst_vp, ax);
 
 target_box = draw_target_box(box_pos, box_h, box_w, g_viapoints, ax);
@@ -103,7 +105,7 @@ model.updateViapoints(can_sys.s, obst_vp, 'obst_vp');
 model.updateViapoints(can_sys.s, g_viapoints, 'target_vp');
 
 plot_future_path(model, can_sys.s, ax, 'color',[0.5 0.5 1]);
-% pause
+pause
 
 % sv = [0 0.4576 0.5496 1];
 % pv = zeros(n_dof, length(sv));
@@ -148,7 +150,7 @@ while (true)
         target_box = draw_target_box(box_pos, box_h, box_w, g_viapoints, ax);
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.8]);
-%         pause
+        pause
     end
     if (obst_changed)
         obst_changed = false; % acknowledged, so disable
@@ -156,7 +158,7 @@ while (true)
         obst = draw_obstacle(obst_pos, obst_h, obst_w, obst_vp, ax);
 %         pause
         plot_future_path(model, can_sys.s, ax, 'color',[0 0 1 0.6]);
-%         pause
+        pause
     end
 
     %% Get reference
@@ -236,7 +238,7 @@ ax{1} = subplot(2,1,1); hold on;  grid on;
 plot(Time, vecnorm(dY_data, 2, 1), 'LineWidth',2.0, 'Color', dmp_path.Color);
 plot(Time, vecnorm(dYd_data, 2, 1), 'LineWidth',2.0, 'Color', pd_plt.Color, 'LineStyle',pd_plt.LineStyle);
 % plot(Time, vecnorm(dY2_data, 2, 1), 'LineWidth',2.0, 'Color', 'magenta', 'LineStyle','--');
-ylabel('vel [$m/s$]', 'interpreter','latex', 'fontsize',15);
+ylabel('vel [$m/s$]', 'interpreter','latex', 'fontsize',16);
 axis tight;
 box on;
 hold off;
@@ -245,7 +247,8 @@ ax{2} = subplot(2,1,2); hold on;  grid on;
 plot(Time, vecnorm(ddY_data, 2, 1), 'LineWidth',2.0, 'Color', dmp_path.Color);
 plot(Time, vecnorm(ddYd_data, 2, 1), 'LineWidth',2.0, 'Color', pd_plt.Color, 'LineStyle',pd_plt.LineStyle);
 % plot(Time, vecnorm(ddY2_data, 2, 1), 'LineWidth',2.0, 'Color', 'magenta', 'LineStyle','--');
-ylabel('accel [$m/s^2$]', 'interpreter','latex', 'fontsize',15);
+ylabel('accel [$m/s^2$]', 'interpreter','latex', 'fontsize',16);
+xlabel('time [$s$]', 'interpreter','latex', 'fontsize',16);
 axis tight;
 box on;
 hold off;

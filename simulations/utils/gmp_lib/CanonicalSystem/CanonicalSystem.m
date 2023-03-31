@@ -36,7 +36,7 @@ classdef CanonicalSystem < handle
                 this.s = this.s + this.s_dot*(tf - t0);
                 
                 if (this.s > this.sf), this.s = this.sf; 
-                elseif (this.s < this.s0) this.s = this.s0;
+                elseif (this.s < this.s0), this.s = this.s0;
                 end
                 
                 return;
@@ -58,9 +58,11 @@ classdef CanonicalSystem < handle
         
             if (nargin < 3), t = 0; end
             
-            if (T < t), error('The current time has already exceeded the duration'); end
-                
-            this.sd_dot = (this.sf - this.s) / (T - t);
+            if (T > t)
+                this.sd_dot = (this.sf - this.s) / (T - t);
+            elseif (T < t)
+                warning(['The current time t=' num2str(t) ' has already exceeded the duration T=' num2str(T)]);
+            end
             
         end
         
@@ -82,8 +84,8 @@ classdef CanonicalSystem < handle
             if (nargin < 2), s = this.s; end
             
             if (s>=this.s0 && s < this.sf), s_ddot = -this.Ds*(s_dot - this.sd_dot);
-            elseif (s>=1),                  s_ddot = -400*s_dot - 1000*(s-this.sf);
-            else,                           s_ddot = -400*s_dot - 1000*(s-this.s0);
+            elseif (s>=1),                  s_ddot = -100*s_dot - 2000*(s-this.sf);
+            else,                           s_ddot = -100*s_dot - 2000*(s-this.s0);
             end
             
         end

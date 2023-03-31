@@ -2,6 +2,7 @@
 gmp_lib_path = strrep(mfilename('fullpath'), 'import_gmp_lib','');
 
 addpath([gmp_lib_path '/gmp_lib/']);
+addpath([gmp_lib_path '/gmp_lib/DMP/']);
 addpath([gmp_lib_path '/gmp_lib/GMP/']);
 addpath([gmp_lib_path '/gmp_lib/GMPo/']);
 addpath([gmp_lib_path '/gmp_lib/TrajScale/']);

@@ -2,11 +2,21 @@ classdef DMP_pp < matlab.mixin.Copyable
     
     methods (Access = public)
         
-        function this = DMP_pp(gmp)
+        function this = DMP_pp(gmp, traj_scale)
+            
+            if (nargin < 2), traj_scale=TrajScale_None(gmp.numOfDoFs()); end
+            
+            this.vp_map = containers.Map();
+            
+            this.K = 300;
+            this.D = 2*sqrt(this.K + 10);
             
             this.gmp = gmp.deepCopy();
             this.n_dof = this.gmp.numOfDoFs();
-            this.gmp.setScaleMethod(TrajScale_None(this.n_dof));
+            this.gmp.setScaleMethod(traj_scale);
+            
+            this.gmp0 = gmp.deepCopy();
+            this.gmp0.setScaleMethod(TrajScale_Prop(this.n_dof));
             
             this.gmp_up = GMP_Update(this.gmp);
             this.W0 = gmp.W;
@@ -14,10 +24,10 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.prev_state = struct('initialized',false, 'target',[], 'sf',nan, 's',nan, 's_dot',nan);
             
             e1 = 1e-0;
-            this.r0 = e1*[1e-9, 1e-7, 1e-7];
-            this.rf = e1*[1e-9, 1e-7, 1e-7];
-            this.r1 = e1*[1e-6 , 1e-6, 1e-4];
-            this.rv = 1e-7;
+            this.r0 = e1*[1e-10, 1e-7, 1e-7];
+            this.rf = e1*[1e-10, 1e-7, 1e-7];
+            this.r1 = e1*[1e-7 , 1e-7, 1e-6];
+            this.rv = 1e-8;
 
             this.setAdaptToRobot(false);
             this.setRecursiveUpdate(true);
@@ -75,6 +85,9 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.y0 = y0;
 
             O_zeros = zeros(this.n_dof, 1);
+            
+            this.gmp.setY0(y0);
+            this.gmp.setGoal(yg);
 
             % initial state constraints: pos, vel, accel
             this.gmp_up.updatePos(s0, this.y0, this.r0(1));
@@ -103,7 +116,7 @@ classdef DMP_pp < matlab.mixin.Copyable
         function update(this, yg, s, s_dot, y, y_dot)
             
             if (~this.prev_state.initialized), error('You need to call DMP_pp::init first!'); end
-            
+
             s0 = 0;
             sf = 1; %max([s, 1.0]);
             s_ddot = 0;
@@ -132,6 +145,8 @@ classdef DMP_pp < matlab.mixin.Copyable
 %             this.gmp.W = this.W1;
 
             % ---------- update --------------
+            this.gmp.setGoal(yg);
+            
             % current state constraints: pos, vel, accel
             this.gmp_up.updatePos(s, y1, this.r1(1));
             this.gmp_up.updateVel(s, s_dot, y1_dot, this.r1(2));
@@ -160,6 +175,59 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.prev_state.initialized = true;
         end
         
+        function removeViapoints(this, vp_name)
+            
+            if this.vp_map.isKey(vp_name)
+                % remove the previous via-points
+                prev_vp = this.vp_map(vp_name);
+                for j=1:length(prev_vp.s)
+                    this.gmp_up.updatePos(prev_vp.s(j), prev_vp.pos(:,j), -this.rv);
+                end
+                this.gmp_up.updateNow();
+                this.vp_map.remove(vp_name);
+            end
+            
+        end
+        
+        function vp_s = updateViapoints(this, s, via_points, vp_name)
+            
+            this.removeViapoints(vp_name);
+            
+            s0 = s;
+            
+            n_points = size(via_points,2);
+            vp_s = zeros(1, n_points);
+
+            s = 1.0;
+            for j=n_points:-1:1
+                s = this.findClosest(s, s0, 60, via_points(:,j));
+                vp_s(j) = s;
+            end
+%             for j=1:n_points
+%                 s = this.findClosest(s, 1.0, 60, via_points(:,j));
+%                 vp_s(j) = s;
+%             end
+ 
+            this.vp_map(vp_name) = struct('s',vp_s, 'pos',via_points);
+            
+%             dmp_pos = zeros(this.n_dof ,n_points);
+%             for j=1:n_points
+%                dmp_pos(:,j) = this.getRefPos(vp_s(j)); 
+%             end
+%             disp([vp_name ': ' sprintf('%f ', vp_s)]);
+%             vp_s
+%             via_points
+%             dmp_pos
+%             pause
+            
+            for j=1:size(via_points,2)
+                this.gmp_up.updatePos(vp_s(j), via_points(:,j), this.rv);
+            end
+            this.gmp_up.updateNow();
+
+        end
+        
+        
         function s = updateViapoint(this, s_v, pos, search_closest, reverse)
         
             if (nargin < 4), search_closest=true; end
@@ -182,29 +250,42 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.gmp_up.updatePos(s, pos, this.rv);
             this.gmp_up.updateNow();
 
-      end
+        end
         
         function p_ref = getRefPos(this, s)
             
             p_ref = this.gmp.getYd(s);
-            if (s > 1), p_ref = this.prev_state.target; end
+            %if (s > 1), p_ref = this.prev_state.target; end
             
         end
         
         function v_ref = getRefVel(this, s, s_dot)
             
             v_ref = this.gmp.getYdDot(s, s_dot);
-            if (s > 1), v_ref = 0*v_ref; end
+            %if (s > 1), v_ref = 0*v_ref; end
             
         end
         
         function a_ref = getRefAccel(this, s, s_dot, s_ddot)
             
             a_ref = this.gmp.getYdDDot(s, s_dot, s_ddot);
-            if (s > 1), a_ref = 0*a_ref; end
+            %if (s > 1), a_ref = 0*a_ref; end
             
         end
-
+        
+        function f_g = goal_attractor(this, y, y_dot, tau)
+           
+            f_g = this.K*(this.gmp.getGoal() - y) - this.D*y_dot;
+            
+        end
+        
+        function f_s = shape_attractor(this, s, s_dot, s_ddot, tau)
+            
+            %this.K*(this.getRefPos(s) - this.gmp.getGoal())*(s<1)
+            f_s = this.K*(this.getRefPos(s) - this.gmp.getGoal()) + this.D*this.getRefVel(s, s_dot) + this.getRefAccel(s, s_dot, s_ddot);
+            
+        end
+        
         %% for compatibility with GMP_MPC:
         function out = getYd(this, s)
             out = this.getRefPos(s);
@@ -216,6 +297,29 @@ classdef DMP_pp < matlab.mixin.Copyable
         
         function n_dof = numOfDoFs(this)
             n_dof = this.n_dof;
+        end
+        
+        function [Time, y_data, dy_data, ddy_data] = generate_trajectory(this, y0, g, Tf, dt)
+           
+            Time = 0:dt:Tf;
+            if (Time(end) < Tf), Time = [Time Time(end)+dt]; end
+            
+            this.init(0, y0, g, Tf);
+            
+            y_data = zeros(this.numOfDoFs(), length(Time));
+            dy_data = zeros(size(y_data));
+            ddy_data = zeros(size(y_data));
+
+            s_data = Time / Time(end);
+            s_dot = 1/Tf;
+            s_ddot = 0;
+            for j=1:length(Time)
+                s = s_data(j);
+                y_data(:, j) = this.getRefPos(s);
+                dy_data(:, j) = this.getRefVel(s, s_dot);
+                ddy_data(:, j) = this.getRefAccel(s, s_dot, s_ddot);
+            end
+            
         end
         
     end
@@ -233,7 +337,9 @@ classdef DMP_pp < matlab.mixin.Copyable
             i_min = 0;
             for i=1:length(s_data)
                 s = s_data(i);
-                dist = norm(pos - this.gmp.getYd(s));
+                
+%                 dist = norm(pos - this.gmp0.getYd(s));
+                dist = norm(pos - this.getRefPos(s));
                 if (dist < min_dist)
                     i_min = i;
                     min_dist = dist;
@@ -247,18 +353,29 @@ classdef DMP_pp < matlab.mixin.Copyable
     end
     
     properties (Access = public)
+        
+        K % DMP stiffness
+        D % DMP damping
 
         r0
         rf
         r1
         rv
         
+        gmp
+        gmp0
+        
     end
     
     properties (Access = protected)
         
+        vp_map
+        
+        y
+        y_dot
+        
         gmp_up
-        gmp
+        
         
         W0
         

@@ -31,9 +31,9 @@ classdef TrajScale_Rot_wb < TrajScale
         %  @param[in] n_wb: 3x1 vector of the normal to the workbench.
         function setWorkBenchNormal(this, n_wb)
             
-            this.n_wb = n_wb;
+            this.n_wb = n_wb(:);
             
-            this.calcScaling();
+            this.calcScaling(this.Y0, this.Yg);
             this.calcInvScaling();
             
         end
@@ -55,7 +55,10 @@ classdef TrajScale_Rot_wb < TrajScale
        
         % ------------------------------------------
         
-        function sc = calcScaling(this)
+        function sc = calcScaling(this, Y0, Yg)
+            
+            this.Y0 = Y0;
+            this.Yg = Yg;
         
             nd = this.Ygd - this.Y0d;  nd = nd/norm(nd);
             n = this.Yg - this.Y0;  n = n/norm(n);
@@ -89,12 +92,11 @@ classdef TrajScale_Rot_wb < TrajScale
             end
             
             sc = R*norm(this.Yg - this.Y0)/norm(this.Ygd - this.Y0d);
-            
         end
         
         function sc = calcInvScaling(this)
         
-            sc = inv(this.calcScaling());
+            sc = inv(this.calcScaling(this.Y0, this.Yg));
             
         end
 

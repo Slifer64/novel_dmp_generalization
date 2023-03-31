@@ -14,7 +14,7 @@ sd_data = Timed/Timed(end);
 
 %% -------- load GMP model --------
 gmp = GMP(n_dofs, 25, 1.5);
-train_err = gmp.train('LS', sd_data, Pd_data)
+train_mse = gmp.train('LS', sd_data, Pd_data)
 
 %% =============  DMP simulation  =============
 disp('Simulation...');
@@ -47,7 +47,7 @@ disp('Simulating DMP++ with ineq constraints...')
 [Time, P_data, dP_data, ddP_data] = simulateModel(@DMP_pp, gmp, y0, g, Tf, dt, pos_lim, vel_lim, accel_lim, slack_limits, opt_metric, via_points);
 
 disp('Simulating DMP with ineq constraints...')
-[Time2, P2_data, dP2_data, ddP2_data] = simulateModel(@DMP_classic, gmp, y0, g, Tf, dt, pos_lim, vel_lim, accel_lim, slack_limits, opt_metric, via_points);
+[Time2, P2_data, dP2_data, ddP2_data] = simulateModel(@DMP_classic_wrapper, gmp, y0, g, Tf, dt, pos_lim, vel_lim, accel_lim, slack_limits, opt_metric, via_points);
 
 %% Plot results
 
@@ -182,19 +182,14 @@ function [Time, Y_data, dY_data, ddY_data] = simulateModel(DMP_model, gmp, y0, y
     final_state_err_tol = [1e-4; 1e-3; 1e-1];
     
     slack_gains = [1e5 100 1];
-
-    time_limit = 0; %2e-3;
-    max_iter = 12000;
-    abs_tol = 1e-3;
-    rel_tol = 1e-5;
         
     %% --------  GMP - MPC  --------
     gmp_mpc = GMP_MPC(dmp_model, N_horizon, pred_time_step, N_kernels, kernels_std_scaling, slack_gains);
     
-    gmp_mpc.settings.max_iter = max_iter;
-    gmp_mpc.settings.time_limit = time_limit;
-    gmp_mpc.settings.abs_tol = abs_tol;
-    gmp_mpc.settings.rel_tol = rel_tol;
+    gmp_mpc.settings.max_iter = 12000;
+    gmp_mpc.settings.time_limit = 0; %2e-3;
+    gmp_mpc.settings.abs_tol = 1e-3;
+    gmp_mpc.settings.rel_tol = 1e-5;
     
     gmp_mpc.setObjCostGains(opt_metric.pos, opt_metric.vel);
     

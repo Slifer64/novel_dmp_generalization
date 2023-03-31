@@ -37,11 +37,9 @@ y0d = Pd_data(:, 1);
 gd = Pd_data(:, end);
 
 y0 = y0d;
-% g = gd + [0.4; 0.4; 0.05];
-% g = gd + [-0.1; 0.05; 0.5];
 
-% g = gd + [-0.5; 0.6; 0];
-% view_ = [-103.6, 5];
+g = gd + [-0.5; 0.6; 0];
+view_ = [-103.6, 5];
 
 % g = gd + [-0.4; -0.2; 0];
 % view_ = [-103.6, 5];
@@ -51,8 +49,6 @@ y0 = y0d;
 
 % g = gd + [0.1; -0.3; 0.3];
 % view_ = [170.8, 10.33];
-
-% g = -gd;
 
 Tf = Timed(end);
 dt = 0.005;
@@ -72,11 +68,11 @@ dt = 0.005;
 % save('data/comp_scalings_demo2.mat', 'Timed', 'Pd_data', 'dPd_data', 'ddPd_data');
 % return
 
-dist0 = norm(gd - y0)
-dist = norm(g - y0)
-g_dist = norm(g - gd)
-z_dist = (g(3) - gd(3))
-xy_dist = norm(g(1:2)-y0(1:2)) - norm(gd(1:2)-y0(1:2))
+% dist0 = norm(gd - y0)
+% dist = norm(g - y0)
+% g_dist = norm(g - gd)
+% z_dist = (g(3) - gd(3))
+% xy_dist = norm(g(1:2)-y0(1:2)) - norm(gd(1:2)-y0(1:2))
 
 %% Accumulate the results
 dat = {};

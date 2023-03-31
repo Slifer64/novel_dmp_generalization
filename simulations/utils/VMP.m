@@ -4,16 +4,25 @@ classdef VMP < matlab.mixin.Copyable
         
         function this = VMP(gmp)
             
+            % dictionaty with {'name': via_points}, 
+            % where 'name' is an object and
+            % via_points are the associated via-points w.r.t. this object
             this.vp_map = containers.Map();
-            
+
             this.K = 300;
             this.D = 2*sqrt(this.K + 10);
             
+            % MP: w'*phi
             this.gmp = gmp.deepCopy();
             this.n_dof = this.gmp.numOfDoFs();
+            
+            % VMP uses w'*phi, without any spatial scaling:
             this.gmp.setScaleMethod(TrajScale_None(gmp.numOfDoFs()));
             
+            % 5-th order polynomial mp
             this.pol5_mp = FifthOrderMP(this.n_dof);
+            
+            this.ensure_continuity = true;
             
         end
 
@@ -28,6 +37,7 @@ classdef VMP < matlab.mixin.Copyable
 
             O_nof = zeros(this.n_dof, 1);
 
+            % solve 5-th order params, so as to match init/final state conditions
             s1 = s_start;
             s2 = 1.0;
 
@@ -44,6 +54,8 @@ classdef VMP < matlab.mixin.Copyable
         end
         
         function update(this, yg, s, s_dot, y, y_dot)
+            
+            % update to new target and/or registered via-points
             
             this.g = yg;
             this.s_dot = s_dot;
@@ -63,15 +75,14 @@ classdef VMP < matlab.mixin.Copyable
                 yddot_via = [yddot_via vp_groups{k}.accel];
             end
             
+            % sort via-points according to their phase
             [~, ind] = sort(s_via);
             s_via = s_via(ind);
             y_via = y_via(:, ind);
             ydot_via = ydot_via(:, ind);
             yddot_via = yddot_via(:, ind);
             
-%             s_via
-%             pause
-            
+            % find the via-points yv(s1), yv(s2) so that: s \in [s1 s2]
             i2 = length(s_via);
             for j=2:length(s_via)
                if (s_via(j) > s)
@@ -84,46 +95,29 @@ classdef VMP < matlab.mixin.Copyable
             s1 = s_via(i1);
             s2 = s_via(i2);
             
-            disp('-----------')
-            fprintf('s=%.3f , s1=%.3f, s2=%.3f \n', s, s1, s2);
-%             pause
+            %disp('-----------')
+            %fprintf('s=%.3f , s1=%.3f, s2=%.3f \n', s, s1, s2);
             
             yv1 = y_via(:,i1);
             yv1_dot = ydot_via(:,i1);
             yv1_ddot = yddot_via(:,i1);
             
-            s1 = s;
-            if (abs(s1 - s2) < 5e-3), s1 = s2 - 5e-3; end
-            yv1 = this.getRefPos(s1);
-            yv1_dot = 1*this.getRefVel(s1, this.s_dot);
-            yv1_ddot = 1*this.getRefAccel(s1, this.s_dot, this.s_ddot);
+            % use current, to also ensure continuity for dynamic via-points 
+            if (this.ensure_continuity)
+                s1 = s;
+                if (abs(s1 - s2) < 5e-3), s1 = s2 - 5e-3; end
+                yv1 = this.getRefPos(s1);
+                yv1_dot = 1*this.getRefVel(s1, this.s_dot);
+                yv1_ddot = 1*this.getRefAccel(s1, this.s_dot, this.s_ddot);
+            end
 
             yv2 = y_via(:,i2);
-            yv2_dot = 1*this.gmp.getYdDot(s2, this.s_dot);
-            yv2_ddot = 1*this.gmp.getYdDDot(s2, this.s_dot, this.s_ddot);
+            yv2_dot = ydot_via(:,i2);
+            yv2_ddot = yddot_via(:,i2);
             
-%             if (s2 > 0.5 && s2 < 0.95)
-%                 yv2_dot = norm(yv2_dot)*[0; -1];
-%                 yv2_ddot = norm(yv2_ddot)*[0; 1];
-%             end
-            
-%             yv2_dot = ydot_via(:,i2);
-%             yv2_ddot = yddot_via(:,i2);
-            
-%             if any(isnan(ydot_via(:,i1)))
-%                 ydot_via(:,i1) = this.getRefVel(s1, this.s_dot);
-%             end
-%             if any(isnan(yddot_via(:,i1)))
-%                 yddot_via(:,i1) = this.getRefAccel(s1, this.s_dot, this.s_ddot);
-%             end
-
             h1 = yv1 - this.gmp.getYd(s1);
             h1_dot = yv1_dot - this.gmp.getYdDot(s1, this.s_dot);
             h1_ddot = yv1_ddot - this.gmp.getYdDDot(s1, this.s_dot, this.s_ddot);
-            
-%             h1 = this.pol5_mp.getRefPos(s1);
-%             h1_dot = this.pol5_mp.getRefVel(s1, this.s_dot);
-%             h1_ddot = this.pol5_mp.getRefAccel(s1, this.s_dot, this.s_ddot);
             
             h2 = yv2 - this.gmp.getYd(s2);
             h2_dot = yv2_dot - this.gmp.getYdDot(s2, this.s_dot);
@@ -142,14 +136,19 @@ classdef VMP < matlab.mixin.Copyable
             vp_s = zeros(1, n_points);
             vp_vel = nan(this.n_dof, n_points);
             vp_accel = nan(this.n_dof, n_points);
+            % assumes that the via-points are given in the time order we want to traverse them 
             for j=1:n_points
+                % find the phase value for the current one, and use this
+                % value as initial starting 's' for the next via-point
+                % search
                 s = this.findClosest(s, 1.0, 60, vp_pos(:,j));
                 vp_s(j) = s;
-                vp_vel(:,j) = nan(this.n_dof,1);
-                vp_accel(:,j) = nan(this.n_dof,1);
+                vp_vel(:,j) = this.gmp.getYdDot(s, this.s_dot);
+                vp_accel(:,j) = this.gmp.getYdDDot(s, this.s_dot, this.s_ddot);
             end
             this.vp_map(vp_name) = struct('s',vp_s, 'pos',vp_pos, 'vel',vp_vel, 'accel',vp_accel);
             
+            % update to new via-points
             this.update(this.g, s0, this.s_dot, this.getRefPos(s), this.getRefVel(s, this.s_dot));
         end
         
@@ -229,6 +228,9 @@ classdef VMP < matlab.mixin.Copyable
                 gd = this.gmp.getYd(1);
                 Ks = diag((this.g - this.y0) ./ (gd - yd0));
                 yd = this.gmp.getYd(s);
+                % VMP does not scale globally to the new target
+                % This can cause problems, when estimating 's'
+                % So scale the demo to new target, to find the most suitable 's'
                 yd = Ks*(yd - yd0) + this.y0;
                 dist = norm(pos - yd);
                 if (dist < min_dist)
@@ -245,31 +247,30 @@ classdef VMP < matlab.mixin.Copyable
     
     properties (Access = public)
         
-        K % DMP stiffness
-        D % DMP damping
-        
-        gmp
-        
-        rv
-        rf
-        r1
-        
-        vp_map
-        
+        % optional, if one wants to simulate VMP as a DMP
+        K % stiffness
+        D % damping
+
     end
     
     properties (Access = protected)
         
+        gmp % MP model: w'*phi that encodes the demo
+        
+        ensure_continuity % flag to ensure continuity for dyanmic via-points
+        
+        vp_map
+        
         n_dof
         
-        y0
-        g
+        y0 % init pos
+        g % target pos
         
-        Tf
+        Tf % time duration
         s_dot
         s_ddot
         
-        pol5_mp
+        pol5_mp % 5-th order polynomial
         
     end
     

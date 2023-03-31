@@ -21,10 +21,10 @@ classdef DMP_pp < matlab.mixin.Copyable
             this.prev_state = struct('initialized',false, 'target',[], 'sf',nan, 's',nan, 's_dot',nan);
             
             e1 = 1e-0;
-            this.r0 = e1*[1e-9, 1e-7, 1e-7];
-            this.rf = e1*[1e-9, 1e-7, 1e-7];
-            this.r1 = e1*[1e-6 , 1e-6, 1e-4];
-            this.rv = 1e-7;
+            this.r0 = e1*[1e-10, 1e-7, 1e-7];
+            this.rf = e1*[1e-10, 1e-7, 1e-7];
+            this.r1 = e1*[1e-7 , 1e-7, 1e-6];
+            this.rv = 1e-8;
 
             this.setAdaptToRobot(false);
             this.setRecursiveUpdate(true);

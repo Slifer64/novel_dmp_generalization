@@ -31,6 +31,6 @@ viapoint_sim('VMP') % for VMP
 ```
 - **Figure 6** : 
 ```
-fig6_sim_ineq_constr.m
+sim_ineq_constr.m
 ```
 Requires that QSQP (matlab interface) is installed (see https://osqp.org/docs/get_started/matlab.html for installation)

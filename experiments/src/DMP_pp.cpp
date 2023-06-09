@@ -1,42 +1,38 @@
-#include <DMP_pp.h>
+#include <online_adapt_controller/utils/DMP_pp.h>
+
+// #include <gmp_lib/gmp_lib.h>
 #include <gmp_lib/io/gmp_io.h>
 #include <gmp_lib/math/math.h>
 
+// #include <ros/package.h>
+
 using namespace as64_;
 
-#define DMP_pp_fun_ std::string("[DMP_pp::") + __func__ + "]: "
+#define DMP_pp_fun_ std::string("[online_adapt_::DMP_pp::") + __func__ + "]: "
 
 DMP_pp::DMP_pp()
 {
   initialized = false;
+}
 
-  recursive_update = true; // To update recursively the "P" matrix
-  sync_update = false; // so that the weights are updated only when "(dmp_pp model)->updateNow()" is called
-  adapt_to_robot_state = false; // default value, that changes through a GUI
-  Sigma_w_type = "accel"; // to optimize the acceleration profile
-  Sigma0_tol = 1.e-1; // for better numerical stability
-  enforce_cont_accel = true; // to use also the acceleration y_ddot{i-1} in the current state constraint
-  
-  // epsilon values
-  r0 = {1.e-9 , 1.e-7 , 1.e-7}; // for initial position
-  rf = {1.e-9 , 1.e-7 , 1.e-7}; // for target position
-  r1 = {1.e-6 , 1.e-6, 1.e-4}; // for current state
-  rv = 1.e-7; // for via-point
+DMP_pp::~DMP_pp()
+{
 
-  if (Sigma_w_type.compare("pos") && Sigma_w_type.compare("vel") && Sigma_w_type.compare("accel") && Sigma_w_type.compare("exp"))
-    throw std::runtime_error(DMP_pp_fun_ + "Unrecognized \"Sigma_w_type\":" + Sigma_w_type + "...");
 }
 
 void DMP_pp::reset(bool reset_model)
 {
+  // if (first_exec || reload_model) this->load(gmp_model_filename);
+  // first_exec = false;
   if (!initialized) throw std::runtime_error(DMP_pp_fun_ + "The model is not initialized. Call \"load()\" first!");
   
   if (reset_model)
   {
-    // reset the weights to the initial values from the demo
     gmp_p->W = W0_p;
     gmp_o->W = W0_o;
   }
+
+  vp_map.clear();
 
   gmp_p_up.reset(new gmp_::GMP_Update(gmp_p.get()));
   gmp_p_up->syncUpdate(sync_update);
@@ -54,9 +50,6 @@ void DMP_pp::reset(bool reset_model)
 
 void DMP_pp::resetSigmaw()
 {
-  // Insted of using the m demo time-stamps, we can also generate 
-  // a sufficient number of uniform time-stamps in [0 1].
-  // Empirically, around 100 points is enough. 
   arma::rowvec s_data = arma::linspace<arma::rowvec>(0, 1, 100);
   if (Sigma_w_type.compare("pos") == 0)
   {
@@ -87,11 +80,19 @@ void DMP_pp::initUpdate(double s_start, const arma::vec &P0, const arma::vec &Pg
 {
   double s0 = 0;
   double sf = 1;
-  double s_dot = 1 / Tf; // according to the canonical system
+  double s_dot = 1 / Tf;
   double s_ddot = 0;
 
   arma::vec O_zeros = arma::vec().zeros(3);
-  
+
+  gmp_p->setY0(P0);
+  gmp_p->setGoal(Pg);
+  gmp_p->setScaleMethod(std::shared_ptr<gmp_::TrajScale>(new gmp_::TrajScale_None(3)));
+
+  gmp_o->setQ0(Q0);
+  gmp_o->setQg(Qg);
+  gmp_o->setScaleMethod(std::shared_ptr<gmp_::TrajScale>(new gmp_::TrajScale_None(3)));
+
   // ---------- Position ------------
 
   // initial state constraints: pos, vel, accel
@@ -161,6 +162,10 @@ void DMP_pp::updatePos(const arma::vec &Pg, double s, double s_dot, const arma::
     if (arma::norm(P1_dot - Pd_dot) < 1e-3) P1_dot = Pd_dot;
   }
 
+  // std::cerr << "ep     = " << arma::norm(P - Pd) << "\n";
+  // std::cerr << "ep_dot = " << arma::norm(P1_dot - Pd_dot) << "\n";
+  // std::cerr << "------------------------\n";
+
   arma::vec O_zeros = arma::vec().zeros(3);
   
   // ---------- downdate --------------
@@ -226,10 +231,13 @@ void DMP_pp::updateOrient(const arma::vec &Qg, double s, double s_dot, const arm
   }
   else
   {
-    // Add a small tolerance to avoid numerical integration drift
     if (arma::norm(gmp_::quatLog(gmp_::quatDiff(Q1, Qd))) < 5e-4) Q1 = Qd;
     if (arma::norm(vRot1 - vRotd) < 1e-3) vRot1 = vRotd;
   }
+
+  // std::cerr << "eo     = " << arma::norm(gmp_::quatLog(gmp_::quatDiff(Q1, Qd))) << "\n";
+  // std::cerr << "eo_dot = " << arma::norm(vRot1 - vRotd) << "\n";
+  // std::cerr << "------------------------\n";
 
   arma::vec O_zeros = arma::vec().zeros(3);
 
@@ -264,56 +272,79 @@ void DMP_pp::updateOrient(const arma::vec &Qg, double s, double s_dot, const arm
 double DMP_pp::updateViapoint(double s_v, const arma::vec &pos, const arma::vec &quat, bool reverse)
 {
   double s;
+  arma::vec pos2 = pos;
+  arma::vec quat2 = quat;
   
   if (reverse)
   {
     s = findClosest(s_v, 0, 60, pos);
     double ds = s*0.1 + 1e-9;
-    s = findClosest(std::min(s+ds, 1.0), std::max(s_v, s-ds), 20, pos);
+    s = findClosest(std::min(s+ds, 1.0), std::max(s_v, s-ds), 20, pos, &pos2);
   }
   else
   {
     s = findClosest(s_v, 1.0, 60, pos);
     double ds = (1-s)*0.1 + 1e-9;
-    s = findClosest(std::max(s_v, s-ds), std::min(s+ds, 1.0), 20, pos);
+    s = findClosest(std::max(s_v, s-ds), std::min(s+ds, 1.0), 20, pos, &pos2);
   }
 
-  gmp_p_up->updatePos(s, pos, rv);
+  if (quat2.has_nan()) quat2 = this->getRefQuat(s);
+
+  gmp_p_up->updatePos(s, pos2, rv);
   gmp_p_up->updateNow();
 
-  gmp_o_up->updateQuat(s, quat, rv);
+  gmp_o_up->updateQuat(s, quat2, rv);
   gmp_o_up->updateNow();
 
   return s;
 }
 
-std::vector<double> DMP_pp::updateViapoints(double s, const std::vector<arma::vec> &Pv, const std::vector<arma::vec> &Qv, const std::string &vp_set)
+std::vector<double> DMP_pp::updateViapoints(double s, const std::vector<arma::vec> &Pv, const std::vector<arma::vec> &Qv, const std::string &vp_set, std::vector<arma::vec> *Pv2, std::vector<arma::vec> *Qv2)
 {
   if (Pv.empty()) return std::vector<double>();
-  
-  std::vector<double> s_v(Pv.size());
+  if (Pv.size() != Qv.size()) throw std::runtime_error(DMP_pp_fun_ + "Pv.size() != QV.size() (" + std::to_string(Pv.size()) + " != " + std::to_string(Qv.size()) + ")");
 
+  std::vector<double> s_v(Pv.size());
+  std::vector<arma::vec> pos_vp(Pv.size());
+  std::vector<arma::vec> quat_vp(Pv.size());
+
+  // use the last updated reference trajectory to specify the via-points' phase
   for (int i=0; i<s_v.size(); i++)
   {
     double s0 = s;
     auto &pos = Pv[i];
+    arma::vec pos2 = pos;
     int n_search = std::max(int((1-s)*50+0.5), 10);
     s = findClosest(s0, 1.0, n_search, pos);
     double ds = (1-s)*0.1 + 1e-9;
-    s = findClosest(std::max(s0, s-ds), std::min(s+ds, 1.0), 10, pos);
+    s = findClosest(std::max(s0, s-ds), std::min(s+ds, 1.0), 10, pos, &pos2);
     s_v[i] = s;
+
+    arma::vec quat2 = Qv[i];
+    if (quat2.has_nan()) quat2 = getRefQuat(s_v[i]);
+
+    pos_vp[i] = pos2;
+    quat_vp[i] = quat2;
   }
 
-  vp_map[vp_set] = ViapointSet(s_v, Pv, Qv);
+  // now downdate
+  this->downdateViapoints(vp_set);
+
+  vp_map[vp_set] = ViapointSet(s_v, pos_vp, quat_vp);
 
   for (int i=0; i<s_v.size(); i++)
   {
-    gmp_p_up->updatePos(s_v[i], Pv[i], rv);
-    gmp_o_up->updateQuat(s_v[i], Qv[i], rv);
+    gmp_p_up->updatePos(s_v[i], pos_vp[i], rv);
+    gmp_o_up->updateQuat(s_v[i], quat_vp[i], rv);
   }
 
   gmp_p_up->updateNow();
   gmp_o_up->updateNow();
+
+  // std::cerr << "sv = " << arma::rowvec(s_v) << "\n";
+
+  if (Pv2) *Pv2 = pos_vp;
+  if (Qv2) *Qv2 = quat_vp;
 
   return s_v;
 }
@@ -323,7 +354,7 @@ void DMP_pp::downdateViapoints(const std::string &vp_set)
   auto it = vp_map.find(vp_set);
   if (it == vp_map.end())
   {
-    std::cerr << ("\33[1;33m" + DMP_pp_fun_ + "The viapoint set \"" + vp_set + "\" does not exist...\33[0m");
+    // std::cerr << ("\33[1;33m" + DMP_pp_fun_ + "The viapoint set \"" + vp_set + "\" does not exist...\33[0m");
     return;
   }
 
@@ -340,7 +371,7 @@ void DMP_pp::downdateViapoints(const std::string &vp_set)
   vp_map.erase(it);
 }
 
-double DMP_pp::findClosest(double s0, double sf, int n_points, const arma::vec &pos) const
+double DMP_pp::findClosest(double s0, double sf, int n_points, const arma::vec &pos, arma::vec *p2) const
 {
   arma::rowvec s_data;
   
@@ -353,14 +384,25 @@ double DMP_pp::findClosest(double s0, double sf, int n_points, const arma::vec &
   for (int i=0; i<s_data.size(); i++)
   {
     double s = s_data(i);
-    double dist = arma::norm(pos - gmp_p->getYd(s));
+    auto idx = arma:: find_finite(pos);
+    double dist = arma::norm(pos.elem(idx) - this->getRefPos(s).elem(idx));
     if (dist < min_dist)
     {
       i_min = i;
       min_dist = dist;
     }
   }
-  return s_data(i_min);
+
+  double s_min = s_data(i_min);
+
+  if (p2)
+  {
+    *p2 = pos;
+    auto idx = arma::find_nonfinite(*p2);
+    p2->elem(idx) = this->getRefPos(s_min).elem(idx);
+  }
+
+  return s_min;
 }
 
 
@@ -385,6 +427,14 @@ arma::vec DMP_pp::getRefAccel(double s, double s_dot, double s_ddot) const
   return gmp_p->getYdDDot(s, s_dot, s_ddot);
 }
 
+arma::vec DMP_pp::getMotionDirection(double s) const
+{
+  arma::vec v = getRefVel(s, 1);
+  double v_norm = arma::norm(v);
+  if (v_norm < 1e-3) v = arma::vec().zeros(3);
+  else v = v / v_norm;
+  return v;
+}
 // ============= Refence Orientation ================
 
 arma::vec DMP_pp::getRefQuat(double s) const
@@ -414,17 +464,14 @@ bool DMP_pp::load(const std::string &filename, std::string *err_msg)
   {
     gmp_::FileIO fid(filename, gmp_::FileIO::in);
 
-    // load pre-trained DMP model for position
     gmp_p.reset(new gmp_::GMP());
     gmp_::read(gmp_p.get(), filename, "pos_");
     gmp_p->setScaleMethod(gmp_::TrajScale::Ptr(new gmp_::TrajScale_None(gmp_p->numOfDoFs())));
 
-    // load pre-trained DMP model for orientation
     gmp_o.reset(new gmp_::GMPo());
     gmp_::read(gmp_o.get(), filename, "orient_");
     gmp_o->setScaleMethod(gmp_::TrajScale::Ptr(new gmp_::TrajScale_None(gmp_o->numOfDoFs())));
 
-    // store the initial (trained from the demo) weights
     this->W0_p = gmp_p->W;
     this->W0_o = gmp_o->W;
 
@@ -457,4 +504,42 @@ bool DMP_pp::save(const std::string &filename, std::string *err_msg)
     if (err_msg) *err_msg = DMP_pp_fun_ + e.what();
     return false;
   }
+}
+
+// ============= Load Params ================
+
+void DMP_pp::loadParams(const std::string &filename, const std::string params_prefix)
+{
+  try
+  {
+    YAML::Node nh = YAML::LoadFile(filename);
+
+    if (params_prefix.empty()) loadParams(nh);
+    else
+    {
+      YAML::Node params_nh;
+      if ( !YAML::getParam(nh, params_prefix, params_nh) ) throw std::runtime_error("Failed to load param \"" + params_prefix + "\"...");
+      loadParams(params_nh);
+    }
+  }
+  catch (std::exception &e)
+  { throw std::runtime_error(DMP_pp_fun_ + e.what()); }
+}
+
+void DMP_pp::loadParams(const YAML::Node &n)
+{
+  if ( !YAML::getParam(n, "recursive_update", recursive_update) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"recursive_update\"...");
+  if ( !YAML::getParam(n, "sync_update", sync_update) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"sync_update\"...");
+  if ( !YAML::getParam(n, "adapt_to_robot_state", adapt_to_robot_state) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"adapt_to_robot_state\"...");
+  if ( !YAML::getParam(n, "Sigma_w_type", Sigma_w_type) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"Sigma_w_type\"...");
+  if ( !YAML::getParam(n, "Sigma0_tol", Sigma0_tol) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"Sigma0_tol\"...");
+  if ( !YAML::getParam(n, "enforce_cont_accel", enforce_cont_accel) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"enforce_cont_accel\"...");
+  
+  if ( !YAML::getParam(n, "r0", r0) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"r0\"...");
+  if ( !YAML::getParam(n, "rf", rf) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"rf\"...");
+  if ( !YAML::getParam(n, "r1", r1) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"r1\"...");
+  if ( !YAML::getParam(n, "rv", rv) ) throw std::runtime_error(DMP_pp_fun_ + "Failed to load param \"rv\"...");
+
+  if (Sigma_w_type.compare("pos") && Sigma_w_type.compare("vel") && Sigma_w_type.compare("accel") && Sigma_w_type.compare("exp"))
+    throw std::runtime_error(DMP_pp_fun_ + "Unrecognized \"Sigma_w_type\":" + Sigma_w_type + "...");
 }

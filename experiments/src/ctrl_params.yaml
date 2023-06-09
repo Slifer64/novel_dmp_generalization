@@ -1,0 +1,171 @@
+# =======  CONTROLLER PARAMS  =========
+
+skip_pick: false
+
+stop_exec_tag_id: 20
+phase_stop_tag_id: 21
+adapt_to_robot_tag_id: 22
+
+P_park: [0.276, -0.666, 0.271]
+Q_park: [0.0421, -0.211, 0.976, 0.0273]
+
+viapoint_params:
+  {
+    tag_id: 0,
+    max_times_tag_not_detected: 0,
+    use_fixed: false, # for debugging
+    fixed_pos: [0.478, -0.49, -0.0518],
+    fixed_quat: [0.00832, -0.427, 0.904, 0.0112]
+  }
+
+pick_target_params:
+  {
+    tag_id: 6,
+    offset:
+      {
+        pos: [0, 0.05, -0.03],
+        rpy: [1.5708, 0, 1.5708]
+      },
+    use_fixed: true, # for debugging
+    fixed_pos: [0.574, 0.48, 0.101],
+    fixed_quat: [0.0104, 0.551, -0.834, -0.012]
+  }
+
+obstacle_params:
+  {
+    tag_id: 3,
+    offset:
+      {
+        pos: [0, -0.12, -0.09],
+        rpy: [0, 0, 0]
+      },
+    vp: # relative to the offsetted tag pose
+      [
+        [-0.2, 0, -0.1],
+        [-0.2, 0, 0.1],
+      ],
+  }
+ 
+obst_bounds: [0.095, 0.25, 0.095]  # semi-axis lengths in x, y, z 
+
+# place_target_params:
+#   {
+#     tag_id: 5, # small
+#     offset:
+#       {
+#         pos: [0, 0.01, -0.14],
+#         rpy: [1.57, 0, 0]
+#       },
+#     vp: # relative to the offsetted tag pose
+#       [
+#         [0, 0, -0.1],
+#         [0, 0, -0.05],
+#       ],
+#   }
+# # to account for the grasped object's size
+# obst_extra_bounds: [0.08, 0.08, 0.05]  # small (digestive)
+
+place_target_params:
+  {
+    tag_id: 4, # large
+    offset:
+      {
+        pos: [0.03, 0.01, -0.16],
+        rpy: [1.57, 0, 0]
+      },
+    vp: # relative to the offsetted tag pose
+      [
+        [0, 0, -0.3],
+        [0, 0, -0.24],
+        [0, 0, -0.18],
+        [0, 0, -0.12],
+        [0, 0, -0.06],
+      ],
+  }
+obst_extra_bounds: [0.08, 0.18, 0.08]  # large box
+
+ctrl_params:
+  {
+    Mp: 5,  # 10
+    Dp: 10,   # 8
+    Kp: 40,  # 30
+
+    Mo: 2,
+    Do: 0.6,
+    Ko: 2,
+
+    a_f: 0.02, # filtering coeff for wrench (1: no filtering)
+
+    enabled_dofs:
+    {
+      dofs: [ 1, 1, 1, 1, 1, 1 ],
+      frame: "base" # tool
+    },
+
+    vel_lim: 0.5,
+  }
+
+
+pick_Tf: 4
+place_Tf: 10
+
+
+a_Tf: 30  # not used yet...
+
+vp_dist_thres: 0.7  # consider only via-points within this distance from the current position
+
+log_reserve: 10000
+log_every: 2
+auto_save: true
+
+model_params:
+  {
+    recursive_update: true,
+    sync_update: false,
+    adapt_to_robot_state: false,
+    Sigma_w_type: "accel",  # "pos", "vel", "accel", "exp"
+    Sigma0_tol: 1.e-1,
+
+    enforce_cont_accel: true,
+
+    r0: [1.e-9 , 1.e-7 , 1.e-7],
+    rf: [1.e-9 , 1.e-7 , 1.e-7],
+    r1: [1.e-6 , 1.e-6, 1.e-4],
+    rv: 1.e-7,
+  }
+
+pick_model_filename: "pick_model.bin"
+place_model_filename: "place_model.bin"
+
+
+# viz_pick: false
+# viz_place: true
+
+viz_params:
+  {
+    robot:
+      {
+        enabled: false,
+        pub_path: true,
+        pub_frame: true,
+        frame_dist: 0.1,
+      },
+
+    dmp:
+      {
+        enabled: true,
+        pub_path: true,
+        pub_frame: true,
+        frame_dist: 0.1,
+      },
+
+    viapoint:
+      {
+        enabled: true,
+        pub_path: false,
+        frame_dist: 0.05
+      },
+
+    pub_rate: 50, # ms
+  }
+

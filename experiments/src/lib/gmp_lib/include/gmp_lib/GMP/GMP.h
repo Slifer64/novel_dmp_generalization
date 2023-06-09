@@ -35,7 +35,7 @@ public:
    *  @param[in] N_kernels the number of kernels
    *  @param[in] kern_std_scale Scaling for std of kernels (optional, default=1).
    */
-  GMP(unsigned n_dofs=1, unsigned N_kernels=2, double kern_std_scale=1.0);
+  GMP(unsigned n_dofs=1, unsigned N_kernels=2, double kern_std_scale=1.5);
 
 
   /** Returns the number of DoFs.

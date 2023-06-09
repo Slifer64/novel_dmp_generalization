@@ -75,8 +75,8 @@ double CanonicalSystem::getPhaseDDot(double s, double s_dot)
 {
   double s_ddot = 0;
   if (s>=this->s0 && s < this->sf) s_ddot = -this->Ds*(s_dot - this->sd_dot);
-  else if (s>=1)                   s_ddot = -400*s_dot - 1000*(s-this->sf);
-  else                             s_ddot = -400*s_dot - 1000*(s-this->s0);
+  else if (s>=1)                   s_ddot = -100*s_dot - 1000*(s-this->sf);
+  else                             s_ddot = -100*s_dot - 1000*(s-this->s0);
   
   return s_ddot;
 }

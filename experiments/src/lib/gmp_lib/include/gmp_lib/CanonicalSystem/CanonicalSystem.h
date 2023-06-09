@@ -52,6 +52,7 @@ public:
    * @return: the 2nd time derivative of the phase
    */
   double getPhaseDDot(double s, double s_dot);
+  double getPhaseDDot() { return getPhaseDDot(s, s_dot); }
   
   /** Set state values to their initial values.
    */ 
